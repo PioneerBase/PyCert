@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-brand-navy: #1E3A78;
+  --color-brand-cream: #F5F5DC;
+  --color-brand-silver: #BDC3C7;
+  --color-brand-charcoal: #2C3E50;
+  --color-brand-charcoal-dark: #1A2634;
+  --color-brand-charcoal-surface: #243342;
+}
+
+/* Custom scrollbars for terminal and editor */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(189, 195, 199, 0.35);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(189, 195, 199, 0.65);
+}
+

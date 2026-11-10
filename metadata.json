@@ -1,0 +1,6 @@
+{
+  "name": "PyCert",
+  "description": "Project-first Python learning platform and portfolio generator aligned with the PCEP-30-03 certification syllabus, featuring an interactive in-browser IDE, progressive 3-tier Code Breadcrumbs, Leitner spaced-repetition flashcards, practice exams, and Git portfolio readiness generator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
