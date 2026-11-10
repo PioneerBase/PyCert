@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 export const HomeDashboard: React.FC = () => {
-  const { setActiveView, selectProject } = useProgress();
+  const { setActiveView, selectProject, currentUser } = useProgress();
   const [isReadmeModalOpen, setIsReadmeModalOpen] = useState<boolean>(false);
   const [flashcardRevealed, setFlashcardRevealed] = useState<boolean>(false);
   const [flashcardMastered, setFlashcardMastered] = useState<boolean | null>(null);
@@ -115,7 +115,7 @@ export const HomeDashboard: React.FC = () => {
 
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-[#2C3E50] dark:text-[#F5F5DC] tracking-tight flex items-center gap-2">
-              <span>Welcome back, Devon!</span>
+              <span>Welcome back, {currentUser.name ? currentUser.name.split(' ')[0] : 'Candidate'}!</span>
               <span className="text-xl">🎯</span>
             </h1>
             <p className="text-xs sm:text-sm text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed">
@@ -463,7 +463,7 @@ export const HomeDashboard: React.FC = () => {
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
-                github.com/devonvance/pcep-prep-2025
+                github.com/{currentUser.githubHandle || 'candidate'}/pcep-prep-2025
               </span>
               <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400">
                 Up to date

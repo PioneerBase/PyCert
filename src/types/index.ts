@@ -137,6 +137,8 @@ export interface UserProfile {
   avatar: string;
   githubHandle: string;
   isAuthenticated: boolean;
+  startingDomain?: number;
+  experienceLevel?: string;
 }
 
 export interface UserProgressState {

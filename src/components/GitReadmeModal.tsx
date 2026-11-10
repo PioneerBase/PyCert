@@ -8,12 +8,12 @@ interface GitReadmeModalProps {
 }
 
 export const GitReadmeModal: React.FC<GitReadmeModalProps> = ({ isOpen, onClose }) => {
-  const { currentProject } = useProgress();
+  const { currentProject, currentUser } = useProgress();
 
   const [activeTab, setActiveTab] = useState<'readme' | 'gitignore'>('readme');
   const [projectTitle, setProjectTitle] = useState<string>(currentProject.title);
-  const [authorName, setAuthorName] = useState<string>('Student Developer');
-  const [githubHandle, setGithubHandle] = useState<string>('your-github');
+  const [authorName, setAuthorName] = useState<string>(currentUser.name || 'Student Developer');
+  const [githubHandle, setGithubHandle] = useState<string>(currentUser.githubHandle || 'your-github');
   const [repoName, setRepoName] = useState<string>('pycert-portfolio-project');
   const [projectDesc, setProjectDesc] = useState<string>(
     currentProject.description || 'A Python application demonstrating core computer science concepts and PCEP-30-03 certification syllabus objectives.'

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 export const PortfolioManager: React.FC = () => {
-  const { setActiveView, selectProject } = useProgress();
+  const { setActiveView, selectProject, currentUser } = useProgress();
   const [filterStatus, setFilterStatus] = useState<'all' | 'synced' | 'ready' | 'draft'>('all');
   const [isReadmeModalOpen, setIsReadmeModalOpen] = useState<boolean>(false);
   const [telemetryLines, setTelemetryLines] = useState<string[]>([
@@ -149,15 +149,15 @@ export const PortfolioManager: React.FC = () => {
 
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-full bg-[#1E3A78] text-[#F5F5DC] flex items-center justify-center font-bold text-sm border-2 border-white dark:border-[#1A2634] shadow-xs">
-                DV
+                {currentUser.avatar || 'CS'}
               </div>
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1 font-bold text-sm text-[#2C3E50] dark:text-[#F5F5DC]">
-                  <span>@devonvance</span>
+                  <span>@{currentUser.githubHandle || 'candidate'}</span>
                   <CheckCircle2 className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 fill-sky-600/10" />
                 </div>
                 <div className="text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7] font-mono">
-                  github.com/devonvance
+                  github.com/{currentUser.githubHandle || 'candidate'}
                 </div>
               </div>
             </div>

@@ -28,7 +28,7 @@ interface ProgressContextType {
   quizHistory: UserProgressState['quizHistory'];
   recordQuizResult: (section: number | 'all', score: number, total: number) => void;
   currentUser: UserProfile;
-  login: (email: string, name?: string) => void;
+  login: (email: string, name?: string, startingDomain?: number, experienceLevel?: string) => void;
   logout: () => void;
   isLoginModalOpen: boolean;
   setIsLoginModalOpen: (open: boolean) => void;
@@ -51,14 +51,16 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(INITIAL_CHECKLIST_ITEMS);
   const [quizHistory, setQuizHistory] = useState<UserProgressState['quizHistory']>([]);
   const [currentUser, setCurrentUser] = useState<UserProfile>({
-    name: 'Devon Vance',
-    email: 'devon.vance@student.edu',
-    role: 'Junior Python Dev',
-    avatar: 'DV',
-    githubHandle: 'devonvance',
-    isAuthenticated: true,
+    name: '',
+    email: '',
+    role: 'PCEP Candidate',
+    avatar: 'ST',
+    githubHandle: '',
+    isAuthenticated: false,
+    startingDomain: 1,
+    experienceLevel: 'Beginner',
   });
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(true);
 
   // Load from local storage once on mount
   useEffect(() => {
@@ -78,6 +80,12 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (parsed.checklistItems) setChecklistItems(parsed.checklistItems);
         if (parsed.quizHistory) setQuizHistory(parsed.quizHistory);
         if (typeof parsed.darkMode === 'boolean') setDarkMode(parsed.darkMode);
+        if (parsed.userProfile && parsed.userProfile.isAuthenticated && parsed.userProfile.name !== 'Devon Vance') {
+          setCurrentUser(parsed.userProfile);
+          setIsLoginModalOpen(false);
+        } else {
+          setIsLoginModalOpen(true);
+        }
       }
     } catch (e) {
       console.warn('Could not parse saved PyCert progress:', e);
@@ -96,12 +104,13 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           checklistItems,
           quizHistory,
           darkMode,
+          userProfile: currentUser,
         })
       );
     } catch (e) {
       console.warn('Failed to save progress to localStorage', e);
     }
-  }, [completedStepsMap, codeSnapshots, flashcards, checklistItems, quizHistory, darkMode]);
+  }, [completedStepsMap, codeSnapshots, flashcards, checklistItems, quizHistory, darkMode, currentUser]);
 
   // Keep dark class on documentElement
   useEffect(() => {
@@ -230,37 +239,55 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const toggleDarkMode = () => setDarkMode((prev) => !prev);
 
-  const login = (email: string, name?: string) => {
-    const rawName = name?.trim() || (email.split('@')[0] ? email.split('@')[0].replace(/[._]/g, ' ') : 'Student Developer');
+  const login = (
+    email: string,
+    name?: string,
+    startingDomain: number = 1,
+    experienceLevel: string = 'Beginner'
+  ) => {
+    const rawName = name?.trim() || (email.split('@')[0] ? email.split('@')[0].replace(/[._]/g, ' ') : 'Student Candidate');
     const displayName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
     const initials = displayName
       .split(' ')
       .map((n) => n[0])
       .join('')
       .toUpperCase()
-      .slice(0, 2) || 'DV';
+      .slice(0, 2) || 'SC';
+
     const profile: UserProfile = {
       name: displayName,
-      email,
-      role: 'PCEP Candidate',
+      email: email || 'candidate@student.pcep',
+      role: `Domain 0${startingDomain} Candidate · ${experienceLevel}`,
       avatar: initials,
-      githubHandle: email.split('@')[0] || 'student-dev',
+      githubHandle: email.split('@')[0] || 'pcep-student',
       isAuthenticated: true,
+      startingDomain,
+      experienceLevel,
     };
+
     setCurrentUser(profile);
     setIsLoginModalOpen(false);
+
+    // Auto-select corresponding micro-project based on selected starting domain
+    const targetProj = MICRO_PROJECTS.find((p) => p.sectionNumber === startingDomain) || MICRO_PROJECTS[0];
+    setSelectedProjectId(targetProj.id);
+    setCurrentStepIndex(0);
+    setActiveView('workspace');
   };
 
   const logout = () => {
     setCurrentUser({
-      name: 'Guest Student',
+      name: '',
       email: '',
-      role: 'Unauthenticated',
-      avatar: 'GS',
+      role: 'Candidate Student',
+      avatar: 'CS',
       githubHandle: '',
       isAuthenticated: false,
+      startingDomain: 1,
+      experienceLevel: 'Beginner',
     });
     setIsLoginModalOpen(true);
+    setActiveView('home');
   };
 
   return (
