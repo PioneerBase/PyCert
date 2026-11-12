@@ -139,6 +139,28 @@ export interface UserProfile {
   isAuthenticated: boolean;
   startingDomain?: number;
   experienceLevel?: string;
+  targetExamDate?: string;
+  studyPace?: 'relaxed' | 'standard' | 'intensive';
+  hasSeenTour?: boolean;
+  diagnosticResult?: {
+    score: number;
+    total: number;
+    recommendedDomain: number;
+    recommendedLevel: string;
+    completedAt: string;
+  };
+}
+
+export interface StreakData {
+  currentStreak: number;
+  longestStreak: number;
+  lastActiveDate: string;
+  activityHistory: string[];
+  todaysTasksCompleted: {
+    lab: boolean;
+    flashcards: boolean;
+    quiz: boolean;
+  };
 }
 
 export interface UserProgressState {
@@ -155,4 +177,5 @@ export interface UserProgressState {
   }>;
   checklistItems: ChecklistItem[];
   userProfile?: UserProfile;
+  streakData?: StreakData;
 }

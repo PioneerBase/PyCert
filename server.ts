@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -9,8 +9,20 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function parsePort(): number {
+  const portIndex = process.argv.indexOf('--port');
+  if (portIndex !== -1 && process.argv[portIndex + 1]) {
+    const p = parseInt(process.argv[portIndex + 1], 10);
+    if (!isNaN(p)) return p;
+  }
+  if (process.env.PORT) {
+    const p = parseInt(process.env.PORT, 10);
+    if (!isNaN(p)) return p;
+  }
+  return 3000;
+}
+const PORT = parsePort();
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '5mb' }));
 
@@ -28,7 +40,7 @@ const ai = apiKey
   : null;
 
 // API Route: AI Breadcrumb Generation & Expansion
-app.post('/api/ai/breadcrumb', async (req, res) => {
+app.post('/api/ai/breadcrumb', async (req: Request, res: Response) => {
   try {
     const { code, objective, stepDescription, tierLevel, userQuestion } = req.body;
 
@@ -82,7 +94,7 @@ Keep response concise, authoritative, and under 120 words. Format cleanly in Mar
 });
 
 // API Route: AI Error Diagnosis
-app.post('/api/ai/diagnose', async (req, res) => {
+app.post('/api/ai/diagnose', async (req: Request, res: Response) => {
   try {
     const { code, traceback, objective } = req.body;
 
@@ -146,7 +158,7 @@ async function startServer() {
   } else {
     const distPath = path.resolve(__dirname, 'dist');
     app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
+    app.get('*', (_req: Request, res: Response) => {
       res.sendFile(path.resolve(distPath, 'index.html'));
     });
   }

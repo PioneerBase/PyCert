@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { MicroProject, Flashcard, ChecklistItem, UserProgressState, UserProfile } from '../types';
+import { MicroProject, Flashcard, ChecklistItem, UserProgressState, UserProfile, StreakData } from '../types';
 import { MICRO_PROJECTS, INITIAL_FLASHCARDS, INITIAL_CHECKLIST_ITEMS } from '../data/pcepCurriculum';
 
 export type AppView = 'home' | 'curriculum' | 'workspace' | 'flashcards' | 'exam' | 'portfolio';
@@ -28,13 +28,79 @@ interface ProgressContextType {
   quizHistory: UserProgressState['quizHistory'];
   recordQuizResult: (section: number | 'all', score: number, total: number) => void;
   currentUser: UserProfile;
+  updateUserProfile: (updates: Partial<UserProfile>) => void;
   login: (email: string, name?: string, startingDomain?: number, experienceLevel?: string) => void;
   logout: () => void;
   isLoginModalOpen: boolean;
   setIsLoginModalOpen: (open: boolean) => void;
+  isAccountModalOpen: boolean;
+  setIsAccountModalOpen: (open: boolean) => void;
+  isDiagnosticModalOpen: boolean;
+  setIsDiagnosticModalOpen: (open: boolean) => void;
+  isTourModalOpen: boolean;
+  setIsTourModalOpen: (open: boolean) => void;
+  resetAllProgress: () => void;
+  completedStepsMap: Record<string, number[]>;
+  readinessPercentage: number;
+  streakData: StreakData;
+  recordActivity: (type?: 'lab' | 'flashcards' | 'quiz' | 'checkin') => void;
+  currentStreak: number;
+  longestStreak: number;
+  hasPracticedToday: boolean;
 }
 
 const STORAGE_KEY = 'pycert_user_progress_v1';
+
+function computeStreak(activityHistory: string[]): { currentStreak: number; hasPracticedToday: boolean } {
+  if (!activityHistory || activityHistory.length === 0) {
+    return { currentStreak: 0, hasPracticedToday: false };
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const hasPracticedToday = activityHistory.includes(todayStr);
+
+  const parseLocalDate = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+
+  const today = parseLocalDate(todayStr);
+  const yesterday = new Date(today.getTime() - 86400000);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  const uniqueDates = new Set(activityHistory);
+
+  let streak = 0;
+  let checkDate = hasPracticedToday ? today : uniqueDates.has(yesterdayStr) ? yesterday : null;
+
+  if (!checkDate) {
+    return { currentStreak: 0, hasPracticedToday: false };
+  }
+
+  while (true) {
+    const dateStr = checkDate.toISOString().split('T')[0];
+    if (uniqueDates.has(dateStr)) {
+      streak++;
+      checkDate = new Date(checkDate.getTime() - 86400000);
+    } else {
+      break;
+    }
+  }
+
+  return { currentStreak: streak, hasPracticedToday };
+}
+
+const INITIAL_STREAK: StreakData = {
+  currentStreak: 0,
+  longestStreak: 0,
+  lastActiveDate: '',
+  activityHistory: [],
+  todaysTasksCompleted: {
+    lab: false,
+    flashcards: false,
+    quiz: false,
+  },
+};
 
 const ProgressContext = createContext<ProgressContextType | undefined>(undefined);
 
@@ -50,6 +116,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [flashcards, setFlashcards] = useState<Flashcard[]>(INITIAL_FLASHCARDS);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(INITIAL_CHECKLIST_ITEMS);
   const [quizHistory, setQuizHistory] = useState<UserProgressState['quizHistory']>([]);
+  const [streakData, setStreakData] = useState<StreakData>(INITIAL_STREAK);
   const [currentUser, setCurrentUser] = useState<UserProfile>({
     name: '',
     email: '',
@@ -59,8 +126,13 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     isAuthenticated: false,
     startingDomain: 1,
     experienceLevel: 'Beginner',
+    hasSeenTour: false,
+    studyPace: 'standard',
   });
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(true);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState<boolean>(false);
+  const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState<boolean>(false);
+  const [isTourModalOpen, setIsTourModalOpen] = useState<boolean>(false);
 
   // Load from local storage once on mount
   useEffect(() => {
@@ -80,6 +152,18 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (parsed.checklistItems) setChecklistItems(parsed.checklistItems);
         if (parsed.quizHistory) setQuizHistory(parsed.quizHistory);
         if (typeof parsed.darkMode === 'boolean') setDarkMode(parsed.darkMode);
+        if (parsed.streakData) {
+          const { currentStreak } = computeStreak(parsed.streakData.activityHistory || []);
+          const todayStr = new Date().toISOString().split('T')[0];
+          const isToday = parsed.streakData.lastActiveDate === todayStr;
+          setStreakData({
+            ...parsed.streakData,
+            currentStreak,
+            todaysTasksCompleted: isToday
+              ? parsed.streakData.todaysTasksCompleted || INITIAL_STREAK.todaysTasksCompleted
+              : INITIAL_STREAK.todaysTasksCompleted,
+          });
+        }
         if (parsed.userProfile && parsed.userProfile.isAuthenticated && parsed.userProfile.name !== 'Devon Vance') {
           setCurrentUser(parsed.userProfile);
           setIsLoginModalOpen(false);
@@ -105,12 +189,13 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           quizHistory,
           darkMode,
           userProfile: currentUser,
+          streakData,
         })
       );
     } catch (e) {
       console.warn('Failed to save progress to localStorage', e);
     }
-  }, [completedStepsMap, codeSnapshots, flashcards, checklistItems, quizHistory, darkMode, currentUser]);
+  }, [completedStepsMap, codeSnapshots, flashcards, checklistItems, quizHistory, darkMode, currentUser, streakData]);
 
   // Keep dark class on documentElement
   useEffect(() => {
@@ -147,7 +232,39 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setActiveView('workspace');
   };
 
+  const recordActivity = (type: 'lab' | 'flashcards' | 'quiz' | 'checkin' = 'checkin') => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    setStreakData((prev) => {
+      const historySet = new Set(prev.activityHistory || []);
+      historySet.add(todayStr);
+      const newHistory = Array.from(historySet).sort();
+
+      const { currentStreak } = computeStreak(newHistory);
+      const newLongest = Math.max(prev.longestStreak || 0, currentStreak);
+
+      const isToday = prev.lastActiveDate === todayStr;
+      const baseTasks = isToday
+        ? prev.todaysTasksCompleted || INITIAL_STREAK.todaysTasksCompleted
+        : INITIAL_STREAK.todaysTasksCompleted;
+
+      const updatedTasks = {
+        lab: baseTasks.lab || type === 'lab',
+        flashcards: baseTasks.flashcards || type === 'flashcards',
+        quiz: baseTasks.quiz || type === 'quiz',
+      };
+
+      return {
+        currentStreak,
+        longestStreak: newLongest,
+        lastActiveDate: todayStr,
+        activityHistory: newHistory,
+        todaysTasksCompleted: updatedTasks,
+      };
+    });
+  };
+
   const markStepComplete = (stepNumber: number) => {
+    recordActivity('lab');
     setCompletedStepsMap((prev) => {
       const existing = prev[selectedProjectId] || [];
       if (!existing.includes(stepNumber)) {
@@ -170,6 +287,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const reviewFlashcard = (cardId: string, gotRight: boolean) => {
+    recordActivity('flashcards');
     setFlashcards((prev) =>
       prev.map((card) => {
         if (card.id !== cardId) return card;
@@ -226,6 +344,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const recordQuizResult = (section: number | 'all', score: number, total: number) => {
+    recordActivity('quiz');
     const newResult = {
       id: `quiz-${Date.now()}`,
       date: new Date().toISOString(),
@@ -238,6 +357,58 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const toggleDarkMode = () => setDarkMode((prev) => !prev);
+
+  // Dynamic readiness score calculation: starts at 0% for new users!
+  const totalPossibleSteps = MICRO_PROJECTS.reduce((acc, p) => acc + p.steps.length, 0);
+  const totalCompletedSteps = Object.values(completedStepsMap).reduce((acc, steps) => acc + steps.length, 0);
+  const labReadiness = totalPossibleSteps > 0 ? (totalCompletedSteps / totalPossibleSteps) * 60 : 0;
+  const quizReadiness = quizHistory.length > 0
+    ? (quizHistory.reduce((acc, q) => acc + q.percentage, 0) / (quizHistory.length * 100)) * 40
+    : 0;
+  const readinessPercentage = Math.min(100, Math.round(labReadiness + quizReadiness));
+
+  const updateUserProfile = (updates: Partial<UserProfile>) => {
+    setCurrentUser((prev) => {
+      const updated = { ...prev, ...updates };
+      if (updates.name) {
+        const rawName = updates.name.trim();
+        const initials = rawName
+          .split(' ')
+          .map((n) => n[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2) || prev.avatar;
+        updated.avatar = initials;
+      }
+      return updated;
+    });
+  };
+
+  const resetAllProgress = () => {
+    setCompletedStepsMap({});
+    setCodeSnapshots({});
+    setFlashcards(INITIAL_FLASHCARDS);
+    setChecklistItems(INITIAL_CHECKLIST_ITEMS);
+    setQuizHistory([]);
+    setStreakData(INITIAL_STREAK);
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          completedStepsMap: {},
+          codeSnapshots: {},
+          flashcards: INITIAL_FLASHCARDS,
+          checklistItems: INITIAL_CHECKLIST_ITEMS,
+          quizHistory: [],
+          darkMode,
+          userProfile: currentUser,
+          streakData: INITIAL_STREAK,
+        })
+      );
+    } catch (e) {
+      console.warn('Failed to reset progress in localStorage', e);
+    }
+  };
 
   const login = (
     email: string,
@@ -254,6 +425,11 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       .toUpperCase()
       .slice(0, 2) || 'SC';
 
+    const defaultExamDate = new Date();
+    defaultExamDate.setDate(defaultExamDate.getDate() + 30);
+
+    const isFirstTime = !currentUser.isAuthenticated && !currentUser.hasSeenTour;
+
     const profile: UserProfile = {
       name: displayName,
       email: email || 'candidate@student.pcep',
@@ -263,6 +439,10 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isAuthenticated: true,
       startingDomain,
       experienceLevel,
+      targetExamDate: currentUser.targetExamDate || defaultExamDate.toISOString().split('T')[0],
+      studyPace: currentUser.studyPace || 'standard',
+      hasSeenTour: currentUser.hasSeenTour || false,
+      diagnosticResult: currentUser.diagnosticResult,
     };
 
     setCurrentUser(profile);
@@ -273,6 +453,11 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setSelectedProjectId(targetProj.id);
     setCurrentStepIndex(0);
     setActiveView('workspace');
+
+    // Auto activate how-to tour on first login/signup as requested!
+    if (isFirstTime || !profile.hasSeenTour) {
+      setIsTourModalOpen(true);
+    }
   };
 
   const logout = () => {
@@ -285,6 +470,8 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isAuthenticated: false,
       startingDomain: 1,
       experienceLevel: 'Beginner',
+      hasSeenTour: false,
+      studyPace: 'standard',
     });
     setIsLoginModalOpen(true);
     setActiveView('home');
@@ -316,10 +503,31 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         quizHistory,
         recordQuizResult,
         currentUser,
+        updateUserProfile,
         login,
         logout,
         isLoginModalOpen,
         setIsLoginModalOpen,
+        isAccountModalOpen,
+        setIsAccountModalOpen,
+        isDiagnosticModalOpen,
+        setIsDiagnosticModalOpen,
+        isTourModalOpen,
+        setIsTourModalOpen,
+        resetAllProgress,
+        completedStepsMap,
+        readinessPercentage,
+        streakData: {
+          ...streakData,
+          currentStreak: computeStreak(streakData.activityHistory).currentStreak,
+        },
+        recordActivity,
+        currentStreak: computeStreak(streakData.activityHistory).currentStreak,
+        longestStreak: Math.max(
+          streakData.longestStreak || 0,
+          computeStreak(streakData.activityHistory).currentStreak
+        ),
+        hasPracticedToday: computeStreak(streakData.activityHistory).hasPracticedToday,
       }}
     >
       {children}

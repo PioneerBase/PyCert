@@ -13,10 +13,25 @@ import {
   CheckCircle2,
   Home,
   FolderGit2,
+  Settings,
+  HelpCircle,
+  User,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { activeView, setActiveView, darkMode, toggleDarkMode, checklistItems, flashcards, currentUser, setIsLoginModalOpen } = useProgress();
+  const {
+    activeView,
+    setActiveView,
+    darkMode,
+    toggleDarkMode,
+    checklistItems,
+    flashcards,
+    currentUser,
+    setIsLoginModalOpen,
+    setIsAccountModalOpen,
+    setIsTourModalOpen,
+    readinessPercentage,
+  } = useProgress();
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const checkedCount = checklistItems.filter((i) => i.checked).length;
@@ -67,32 +82,60 @@ export const Navbar: React.FC = () => {
         </form>
 
         {/* Right Status Badges & Profile */}
-        <div className="flex items-center gap-3 shrink-0">
-          {/* PCEP-30-03 Readiness Indicator */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* PCEP-30-03 Dynamic Readiness Indicator (starts at 0% for new users!) */}
           <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-lg border border-[#BDC3C7]/80 dark:border-[#2C3E50] bg-white dark:bg-[#141C24] text-xs font-mono">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <CheckCircle2 className={`w-3.5 h-3.5 ${readinessPercentage > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#BDC3C7]'}`} />
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-[#2C3E50]/70 dark:text-[#BDC3C7] font-semibold">
                 PCEP-30-03 READINESS:
               </span>
               <span className="font-bold text-[#1E3A78] dark:text-[#F5F5DC]">
-                78% Exam Standard
+                {readinessPercentage}% Exam Standard
               </span>
             </div>
           </div>
 
-          {/* Student Profile Avatar / Login Trigger */}
+          {/* How-To Guide Button */}
           <button
-            onClick={() => setIsLoginModalOpen(true)}
-            className="flex items-center gap-2 pl-1 border-l border-[#BDC3C7]/50 dark:border-[#2C3E50] hover:opacity-85 transition-opacity cursor-pointer text-left"
-            title="Click to sign in or switch student profile"
+            onClick={() => setIsTourModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[#2C3E50] dark:text-[#BDC3C7] hover:text-[#1E3A78] dark:hover:text-[#F5F5DC] rounded-lg border border-[#BDC3C7]/70 dark:border-[#2C3E50] hover:bg-white dark:hover:bg-[#243342] transition-colors cursor-pointer"
+            title="Site Navigation How-To Guide"
           >
-            <div className="w-7 h-7 rounded-full bg-[#1E3A78] text-[#F5F5DC] flex items-center justify-center font-bold text-xs shadow-xs">
-              {currentUser.avatar}
+            <HelpCircle className="w-3.5 h-3.5 text-[#1E3A78] dark:text-amber-400" />
+            <span className="hidden md:inline">How-To Guide</span>
+          </button>
+
+          {/* Account Button (when logged in) */}
+          {currentUser.isAuthenticated && (
+            <button
+              onClick={() => setIsAccountModalOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] rounded-lg shadow-xs transition-colors cursor-pointer"
+              title="Process Account Changes & Settings"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Account</span>
+            </button>
+          )}
+
+          {/* Student Profile Avatar / Login / Account Trigger */}
+          <button
+            onClick={() => {
+              if (currentUser.isAuthenticated) {
+                setIsAccountModalOpen(true);
+              } else {
+                setIsLoginModalOpen(true);
+              }
+            }}
+            className="flex items-center gap-2 pl-1 border-l border-[#BDC3C7]/50 dark:border-[#2C3E50] hover:opacity-85 transition-opacity cursor-pointer text-left"
+            title={currentUser.isAuthenticated ? 'Open Account Settings' : 'Sign in to PyCert'}
+          >
+            <div className="w-7 h-7 rounded-full bg-[#5A1827] text-[#F5F5DC] flex items-center justify-center font-bold text-xs shadow-xs">
+              {currentUser.avatar || 'SC'}
             </div>
             <div className="hidden lg:flex flex-col text-left">
               <span className="text-xs font-bold text-[#2C3E50] dark:text-[#F5F5DC] leading-none">
-                {currentUser.name}
+                {currentUser.name || 'Student Candidate'}
               </span>
               <span className="text-[10px] text-[#2C3E50]/70 dark:text-[#BDC3C7] font-mono leading-none mt-0.5">
                 {currentUser.isAuthenticated ? currentUser.role : 'Sign In'}

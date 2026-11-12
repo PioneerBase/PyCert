@@ -27,15 +27,28 @@ interface DomainOption {
 }
 
 export const LoginModal: React.FC = () => {
-  const { isLoginModalOpen, setIsLoginModalOpen, login, currentUser } = useProgress();
+  const {
+    isLoginModalOpen,
+    setIsLoginModalOpen,
+    login,
+    currentUser,
+    setIsDiagnosticModalOpen,
+  } = useProgress();
 
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [rememberMe, setRememberMe] = useState<boolean>(true);
-  const [selectedDomain, setSelectedDomain] = useState<number>(1);
+  const [selectedDomain, setSelectedDomain] = useState<number>(currentUser.startingDomain || 1);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Sync if diagnostic exam set a recommended starting domain
+  React.useEffect(() => {
+    if (currentUser.startingDomain) {
+      setSelectedDomain(currentUser.startingDomain);
+    }
+  }, [currentUser.startingDomain]);
 
   if (!isLoginModalOpen) return null;
 
@@ -228,6 +241,26 @@ export const LoginModal: React.FC = () => {
               <p className="text-xs text-[#2C3E50]/70 dark:text-[#BDC3C7] leading-relaxed">
                 Choose where you want to begin based on your current comfort level with Python.
               </p>
+            </div>
+
+            {/* Quick Diagnostic Assessment Prompt */}
+            <div className="p-3.5 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-900 dark:text-amber-300">
+                  Not Sure Where To Start?
+                </span>
+                <p className="text-xs text-[#2C3E50]/80 dark:text-[#BDC3C7]">
+                  Take our 2-minute diagnostic exam to gauge your level and recommend your starting domain.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDiagnosticModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#5A1827] hover:bg-[#48121E] shadow-xs whitespace-nowrap shrink-0 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span>Take Diagnostic Exam</span>
+              </button>
             </div>
 
             {/* Starting Domain Selection Cards */}

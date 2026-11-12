@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useProgress } from '../context/ProgressContext';
 import { PCEP_SECTIONS, MICRO_PROJECTS } from '../data/pcepCurriculum';
 import { GitReadmeModal } from './GitReadmeModal';
+import { DailyStreakTracker } from './DailyStreakTracker';
 import {
   Sparkles,
   Calendar,
@@ -20,75 +21,135 @@ import {
   Maximize2,
   Settings,
   RefreshCw,
+  Compass,
+  HelpCircle,
+  User,
 } from 'lucide-react';
 
 export const HomeDashboard: React.FC = () => {
-  const { setActiveView, selectProject, currentUser } = useProgress();
+  const {
+    setActiveView,
+    selectProject,
+    currentUser,
+    completedStepsMap,
+    readinessPercentage,
+    setIsDiagnosticModalOpen,
+    setIsTourModalOpen,
+    setIsAccountModalOpen,
+    currentStreak,
+  } = useProgress();
   const [isReadmeModalOpen, setIsReadmeModalOpen] = useState<boolean>(false);
   const [flashcardRevealed, setFlashcardRevealed] = useState<boolean>(false);
   const [flashcardMastered, setFlashcardMastered] = useState<boolean | null>(null);
 
-  // Quick stats
-  const readinessPercentage = 78;
-  const daysRemaining = 14;
-  const streakDays = 12;
+  // Calculate dynamic days remaining from user's target exam date
+  const targetDate = currentUser.targetExamDate
+    ? new Date(currentUser.targetExamDate)
+    : new Date(Date.now() + 30 * 86400000);
+  const diffTime = targetDate.getTime() - Date.now();
+  const daysRemaining = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-  // Domain progress metrics
+  // Dynamic user streak: 0 days for fresh users until they complete tasks
+  const totalCompletedTasks = Object.values(completedStepsMap).reduce(
+    (acc, steps) => acc + steps.length,
+    0
+  );
+  const streakDays = totalCompletedTasks > 0 ? 1 : 0;
+
+  // Dynamic domain progress metrics: starts at 0% for new users!
+  const getDomainMetrics = (domainNum: number) => {
+    const domainProjects = MICRO_PROJECTS.filter((p) => p.sectionNumber === domainNum);
+    const totalSteps = domainProjects.reduce((acc, p) => acc + p.steps.length, 0);
+    const completedSteps = domainProjects.reduce(
+      (acc, p) => acc + (completedStepsMap[p.id]?.length || 0),
+      0
+    );
+    const pct = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+    return {
+      pct,
+      completedSteps,
+      totalSteps,
+      projectsCount: domainProjects.length,
+    };
+  };
+
+  const domain1 = getDomainMetrics(1);
+  const domain2 = getDomainMetrics(2);
+  const domain3 = getDomainMetrics(3);
+  const domain4 = getDomainMetrics(4);
+  const domain5 = getDomainMetrics(5);
+
   const domainSummaries = [
     {
       num: 1,
       title: 'Computer Programming & Fundamentals',
       desc: 'Literals, variables, comments, numerical operators, type casting, console I/O...',
-      progress: 95,
-      badgeText: '95% Complete',
-      badgeColor: 'text-emerald-700 bg-emerald-100/80 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800',
-      footerLeft: '8 tasks completed',
-      footerRight: '2 projects',
+      progress: domain1.pct,
+      badgeText: domain1.pct === 0 ? '0% Ready to Start' : `${domain1.pct}% In Progress`,
+      badgeColor:
+        domain1.pct > 0
+          ? 'text-emerald-700 bg-emerald-100/80 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
+          : 'text-[#2C3E50]/70 bg-[#EBE9DF] dark:bg-[#1A2634] dark:text-[#BDC3C7] border-[#BDC3C7]/60 dark:border-[#2C3E50]',
+      footerLeft: `${domain1.completedSteps} of ${domain1.totalSteps} tasks`,
+      footerRight: `${domain1.projectsCount} projects`,
     },
     {
       num: 2,
       title: 'Control Flow: Decisions & Loops',
       desc: 'Conditional execution, if-elif-else branches, while & for loops, walrus operator...',
-      progress: 82,
-      badgeText: '82% In Progress',
-      badgeColor: 'text-amber-800 bg-amber-100/80 dark:bg-amber-950/40 dark:text-amber-400 border-amber-300 dark:border-amber-800',
-      footerLeft: '6 tasks completed',
-      footerRight: '1 project',
+      progress: domain2.pct,
+      badgeText: domain2.pct === 0 ? '0% Not Started' : `${domain2.pct}% In Progress`,
+      badgeColor:
+        domain2.pct > 0
+          ? 'text-amber-800 bg-amber-100/80 dark:bg-amber-950/40 dark:text-amber-400 border-amber-300 dark:border-amber-800'
+          : 'text-[#2C3E50]/70 bg-[#EBE9DF] dark:bg-[#1A2634] dark:text-[#BDC3C7] border-[#BDC3C7]/60 dark:border-[#2C3E50]',
+      footerLeft: `${domain2.completedSteps} of ${domain2.totalSteps} tasks`,
+      footerRight: `${domain2.projectsCount} project`,
     },
     {
       num: 3,
       title: 'Data Collections: Lists, Tuples & Dicts',
       desc: 'Slicing, indexing, immutability concepts, list methods, string algorithms...',
-      progress: 64,
-      badgeText: '64% Active',
-      badgeColor: 'text-[#1E3A78] bg-[#1E3A78]/10 dark:bg-[#1E3A78]/30 dark:text-[#F5F5DC] border-[#1E3A78]/30 dark:border-[#BDC3C7]/40',
-      footerLeft: '7 active drills',
-      footerRight: 'Lab assigned',
+      progress: domain3.pct,
+      badgeText: domain3.pct === 0 ? '0% Not Started' : `${domain3.pct}% Active`,
+      badgeColor:
+        domain3.pct > 0
+          ? 'text-[#1E3A78] bg-[#1E3A78]/10 dark:bg-[#1E3A78]/30 dark:text-[#F5F5DC] border-[#1E3A78]/30 dark:border-[#BDC3C7]/40'
+          : 'text-[#2C3E50]/70 bg-[#EBE9DF] dark:bg-[#1A2634] dark:text-[#BDC3C7] border-[#BDC3C7]/60 dark:border-[#2C3E50]',
+      footerLeft: `${domain3.completedSteps} of ${domain3.totalSteps} tasks`,
+      footerRight: `${domain3.projectsCount} project`,
     },
     {
       num: 4,
       title: 'Functions, Scopes & Exceptions',
       desc: 'def statements, positional vs keyword arguments, NoneType, try-except blocks...',
-      progress: 45,
-      badgeText: '45% Priority',
-      badgeColor: 'text-[#5A1827] bg-[#5A1827]/10 dark:bg-[#5A1827]/30 dark:text-[#F5F5DC] border-[#5A1827]/30',
-      footerLeft: 'Needs practice',
+      progress: domain4.pct,
+      badgeText: domain4.pct === 0 ? '0% High Weight' : `${domain4.pct}% Priority`,
+      badgeColor:
+        domain4.pct > 0
+          ? 'text-[#5A1827] bg-[#5A1827]/10 dark:bg-[#5A1827]/30 dark:text-[#F5F5DC] border-[#5A1827]/30'
+          : 'text-[#2C3E50]/70 bg-[#EBE9DF] dark:bg-[#1A2634] dark:text-[#BDC3C7] border-[#BDC3C7]/60 dark:border-[#2C3E50]',
+      footerLeft: `${domain4.completedSteps} of ${domain4.totalSteps} tasks`,
       footerRight: 'High exam weight',
     },
     {
       num: 5,
       title: 'File Handling & Module Imports',
       desc: 'Text file modes (r/w/a), context managers (with open), CSV processing, math and random modules...',
-      progress: 70,
-      badgeText: '70% Verified',
-      badgeColor: 'text-emerald-700 bg-emerald-100/80 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800',
-      footerLeft: '5 drills passed',
-      footerRight: '1 project',
+      progress: domain5.pct,
+      badgeText: domain5.pct === 0 ? '0% Capstone' : `${domain5.pct}% Verified`,
+      badgeColor:
+        domain5.pct > 0
+          ? 'text-emerald-700 bg-emerald-100/80 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
+          : 'text-[#2C3E50]/70 bg-[#EBE9DF] dark:bg-[#1A2634] dark:text-[#BDC3C7] border-[#BDC3C7]/60 dark:border-[#2C3E50]',
+      footerLeft: `${domain5.completedSteps} of ${domain5.totalSteps} tasks`,
+      footerRight: `${domain5.projectsCount} project`,
     },
   ];
 
   const handleLaunchCaesarCipher = () => {
-    const cipherProj = MICRO_PROJECTS.find((p) => p.id === 'proj-03-caesar-cipher') || MICRO_PROJECTS[0];
+    const cipherProj =
+      MICRO_PROJECTS.find((p) => p.id === 'proj-03-caesar-cipher') || MICRO_PROJECTS[0];
     selectProject(cipherProj.id);
     setActiveView('workspace');
   };
@@ -108,8 +169,8 @@ export const HomeDashboard: React.FC = () => {
               <span>{daysRemaining} Days Remaining</span>
             </span>
             <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-[#EBE9DF] dark:bg-[#1A2634] text-amber-700 dark:text-amber-400 border border-[#BDC3C7]/60 dark:border-[#2C3E50]">
-              <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-              <span>{streakDays}-Day Streak</span>
+              <Flame className={`w-3.5 h-3.5 ${currentStreak > 0 ? 'fill-amber-500 text-amber-500' : 'text-slate-400'}`} />
+              <span>{currentStreak} {currentStreak === 1 ? 'Day' : 'Days'} Streak</span>
             </span>
           </div>
 
@@ -206,6 +267,69 @@ export const HomeDashboard: React.FC = () => {
         {/* Decorative background grid pattern */}
         <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 pointer-events-none bg-[radial-gradient(#1E3A78_1px,transparent_1px)] [background-size:16px_16px]" />
       </div>
+
+      {/* Onboarding & Calibration Strip: Readiness Exam, Tour, and Account */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <div className="p-4 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/20 flex flex-col justify-between space-y-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-900 dark:text-amber-300">
+              <Compass className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span>Readiness Diagnostic</span>
+            </div>
+            <p className="text-xs text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed">
+              Take a short 5-question exam to gauge your Python experience and receive a tailored domain placement recommendation.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsDiagnosticModalOpen(true)}
+            className="self-start px-3 py-1.5 text-xs font-semibold text-[#F5F5DC] bg-[#5A1827] hover:bg-[#48121E] rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>Run Diagnostic</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="p-4 rounded-xl border border-sky-300 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-950/20 flex flex-col justify-between space-y-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-sky-900 dark:text-sky-300">
+              <HelpCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+              <span>Site Navigation How-To Guide</span>
+            </div>
+            <p className="text-xs text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed">
+              Explore how the browser IDE, PyTest automated test runner, and tiered code breadcrumbs accelerate your preparation.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsTourModalOpen(true)}
+            className="self-start px-3 py-1.5 text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>Launch Site Tour</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="p-4 rounded-xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] flex flex-col justify-between space-y-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-[#1E3A78] dark:text-[#BDC3C7]">
+              <Settings className="w-4 h-4 text-[#1E3A78] dark:text-[#BDC3C7]" />
+              <span>Account & Study Settings</span>
+            </div>
+            <p className="text-xs text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed">
+              Manage student credentials, update starting domain (Domain 1-5), adjust your target exam date, or reset progress.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsAccountModalOpen(true)}
+            className="self-start px-3 py-1.5 text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-white dark:bg-[#1A2634] hover:bg-[#EBE9DF] border border-[#BDC3C7] dark:border-[#2C3E50] rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>Open Account</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Daily Learning Streak & Consistency Tracker */}
+      <DailyStreakTracker />
 
       {/* Core Examination Matrix Header & 4 Domain Cards */}
       <section className="space-y-4">

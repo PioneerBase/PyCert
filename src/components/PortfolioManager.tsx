@@ -26,8 +26,8 @@ export const PortfolioManager: React.FC = () => {
   const [isReadmeModalOpen, setIsReadmeModalOpen] = useState<boolean>(false);
   const [telemetryLines, setTelemetryLines] = useState<string[]>([
     '$ git remote -v',
-    'origin https://github.com/devonvance/pycert-pcep.git (fetch)',
-    'origin https://github.com/devonvance/pycert-pcep.git (push)',
+    `origin https://github.com/${currentUser.githubHandle || 'candidate'}/pycert-pcep.git (fetch)`,
+    `origin https://github.com/${currentUser.githubHandle || 'candidate'}/pycert-pcep.git (push)`,
     '$ pytest --tb=line tests/',
     '==== 18 passed, 0 warnings in 0.24s ====',
   ]);
@@ -57,10 +57,10 @@ export const PortfolioManager: React.FC = () => {
       '[main 8f31b0a] feat(pcep): synchronize capstone repositories',
       ' 12 files changed, 438 insertions(+)',
       '$ git push origin main --tags',
-      'To https://github.com/devonvance/pycert-pcep.git',
+      `To https://github.com/${currentUser.githubHandle || 'candidate'}/pycert-pcep.git`,
       '   e4f9b2c..8f31b0a  main -> main',
       ' * [new tag]         v1.0.0-pcep-certified -> v1.0.0-pcep-certified',
-      '==== Batch Git Push Complete: 4 Repos Synced ====',
+      '==== Batch Git Push Complete: 5 Repos Synced ====',
     ]);
     setTimeout(() => {
       setSyncing(false);

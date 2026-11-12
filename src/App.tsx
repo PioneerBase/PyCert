@@ -8,6 +8,9 @@ import { FlashcardsView } from './components/FlashcardsView';
 import { ExamSimulator } from './components/ExamSimulator';
 import { PortfolioManager } from './components/PortfolioManager';
 import { LoginModal } from './components/LoginModal';
+import { AccountModal } from './components/AccountModal';
+import { DiagnosticExamModal } from './components/DiagnosticExamModal';
+import { HowToGuideModal } from './components/HowToGuideModal';
 
 const MainContent: React.FC = () => {
   const { activeView } = useProgress();
@@ -31,6 +34,9 @@ export default function App() {
         <Navbar />
         <MainContent />
         <LoginModal />
+        <AccountModal />
+        <DiagnosticExamModal />
+        <HowToGuideModal />
 
         {/* Quiet, clean Footer adhering to Constitution */}
         <footer className="border-t border-[#BDC3C7]/70 dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#151D26] py-6 text-xs text-[#5D6D7E] dark:text-[#BDC3C7] transition-colors">

@@ -1,6 +1,0 @@
-{
-  "summary":  "Implementation plan to incorporate key features from the mock UI attachments into PyCert:\n- Comprehensive Home Dashboard with exam readiness gauge, daily flashcard quick-drill, and syllabus progress matrix\n- Interactive IDE Lab Specifications with Modulo/Algorithm diagrams, acceptance criteria, and automated PyTest test matrix\n- Portfolio Capstone Manager with Git remote host telemetry and pre-flight audit checklist\n- Top navigation bar enhancements with PCEP topic search and student profile indicator\n- Warm Navy, Cream, and Charcoal palette enriched with subtle burgundy accents",
-  "updatedAt":  "2026-11-10T17:43:58.225608162Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}
