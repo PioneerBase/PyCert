@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ProgressProvider, useProgress } from './context/ProgressContext';
 import { Navbar } from './components/Navbar';
 import { HomeDashboard } from './components/HomeDashboard';
@@ -14,10 +14,16 @@ import { HowToGuideModal } from './components/HowToGuideModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 const MainContent: React.FC = () => {
-  const { activeView } = useProgress();
+  const { activeView, selectedProjectId } = useProgress();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [activeView, selectedProjectId]);
 
   return (
-    <main className="flex-1 pb-16">
+    <main className="flex-1 w-full pb-16">
       {activeView === 'home' && <HomeDashboard />}
       {activeView === 'curriculum' && <CurriculumView />}
       {activeView === 'workspace' && <Workspace />}

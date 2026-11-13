@@ -65,7 +65,7 @@ export const Workspace: React.FC = () => {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
-  const terminalEndRef = useRef<HTMLDivElement>(null);
+  const terminalContainerRef = useRef<HTMLDivElement>(null);
 
   const currentStep = currentProject.steps[currentStepIndex] || currentProject.steps[0];
   const fileName = currentProject.fileName || `${currentProject.id.replace(/-/g, '_')}.py`;
@@ -80,9 +80,11 @@ export const Workspace: React.FC = () => {
     );
   }, [currentProject.id, currentProject.title, fileName]);
 
-  // Auto-scroll terminal on new output
+  // Auto-scroll only inside the terminal box without moving the main page viewport
   useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (terminalContainerRef.current) {
+      terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight;
+    }
   }, [terminalOutput]);
 
   const codeLines = currentCode.split('\n');
@@ -862,10 +864,12 @@ ${summaryFooter}
             </div>
 
             {/* Terminal Body */}
-            <div className="p-4 font-mono text-xs text-[#F5F5DC] min-h-[200px] max-h-[320px] overflow-y-auto leading-relaxed scrollbar-thin">
+            <div
+              ref={terminalContainerRef}
+              className="p-4 font-mono text-xs text-[#F5F5DC] min-h-[200px] max-h-[320px] overflow-y-auto leading-relaxed scrollbar-thin"
+            >
               <pre className="whitespace-pre-wrap font-mono">
                 <code>{terminalOutput}</code>
-                <div ref={terminalEndRef} />
               </pre>
             </div>
           </div>
