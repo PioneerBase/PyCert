@@ -47,14 +47,14 @@ export const HowToGuideModal: React.FC = () => {
       navHighlightView: 'home',
     },
     {
-      title: 'Step-by-Step Syllabus Labs & In-Browser IDE',
-      tagline: 'Repeatable Worked Pattern -> Code -> Instant Check',
+      title: 'Step-by-Step Python Notebook Cells',
+      tagline: 'Run Code Part by Part with Shared Kernel State',
       description:
-        'Each lab breaks a PCEP domain into 3 clear steps you can complete in order from top to bottom inside the built-in Python IDE.',
+        'Each Syllabus Lab works like an interactive Jupyter notebook: every step has its own editable Python cell running on one shared kernel.',
       bulletPoints: [
-        'Read the Worked Pattern example on the left to see how Python solves that type of task.',
-        'Replace the # TODO line in the full-height editor, then click "Check Step" for instant feedback.',
-        'Run all steps anytime with "Run Tests (Ctrl+Enter)" to watch green checkmarks light up.',
+        'Open the Worked Pattern example in any cell to see an analogous solution before writing code.',
+        'Replace the # TODO line, then press Shift+Enter or click "Run & Check Step" to see output, pass/fail checks, and live variables right below the cell.',
+        'Variables and functions stay alive across cells — use "Run All Cells" or "Restart Kernel" anytime.',
       ],
       icon: <Code2 className="w-6 h-6 text-emerald-400" />,
       navHighlightView: 'workspace',

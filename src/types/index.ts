@@ -35,6 +35,23 @@ export interface ProjectStep {
   starterSnippet?: string;
 }
 
+export interface NotebookCell {
+  id: string;
+  kind: 'setup' | 'step';
+  stepNumber?: number;
+  title: string;
+  description?: string;
+  starterCode: string;
+  solutionCode: string;
+  readOnly?: boolean;
+}
+
+export interface KernelVariable {
+  name: string;
+  typeName: string;
+  reprValue: string;
+}
+
 export interface MicroProject {
   id: string;
   title: string;
@@ -52,6 +69,7 @@ export interface MicroProject {
   pitfallWarning?: string;
   starterCode: string;
   solutionCode: string;
+  notebookCells?: NotebookCell[];
   steps: ProjectStep[];
 }
 

@@ -1,4 +1,6 @@
-// Client-Side Python Execution Engine (Pyodide WebAssembly with Instant Built-in Simulator Fallback)
+import { KernelVariable } from '../types';
+
+// Client-Side Python Execution Engine (Pyodide WebAssembly Shared Notebook Kernel + Stateful Simulator Fallback)
 
 declare global {
   interface Window {
@@ -16,7 +18,33 @@ export interface ExecutionResult {
   isError: boolean;
 }
 
+export interface StepCheckConfig {
+  stepNumber: number;
+  validationSnippet: string;
+  diagnosticExpr?: string;
+  expectedExample?: string;
+}
+
+export interface NotebookCellResult {
+  stdout: string;
+  stderr: string;
+  isError: boolean;
+  durationMs: number;
+  engine: 'pyodide-wasm' | 'simulated-engine';
+  executionCount: number;
+  variables: KernelVariable[];
+  stepCheck?: {
+    passed: boolean;
+    message?: string;
+  };
+}
+
 let pyodideLoadingPromise: Promise<any> | null = null;
+let notebookExecutionCount = 0;
+
+// Stateful fallback storage for offline / warming-up browser execution
+let simCellSources = new Map<string, string>();
+let simExecutionVariables: KernelVariable[] = [];
 
 export async function getPyodide(): Promise<any | null> {
   if (typeof window === 'undefined') return null;
@@ -57,20 +85,43 @@ export async function getPyodide(): Promise<any | null> {
 }
 
 /**
- * Execute Python code in-browser
+ * Reset the shared Jupyter notebook kernel namespace & execution counter
  */
-export async function executePythonCode(
-  code: string,
-  userInputs: string[] = []
-): Promise<ExecutionResult> {
-  const startTime = performance.now();
+export async function resetNotebookKernel(): Promise<void> {
+  notebookExecutionCount = 0;
+  simCellSources = new Map<string, string>();
+  simExecutionVariables = [];
 
-  // Try Pyodide WebAssembly engine first
+  if (typeof window !== 'undefined' && window.pyodideInstance) {
+    try {
+      await window.pyodideInstance.runPythonAsync(`
+_pycert_ns = {}
+`);
+    } catch (err) {
+      console.warn('Could not clear Pyodide notebook namespace:', err);
+    }
+  }
+}
+
+/**
+ * Execute a single notebook cell inside the shared Python kernel,
+ * optionally run its step validation inside the same namespace,
+ * and return stdout, stderr, step check status, and live kernel variables.
+ */
+export async function executeNotebookCell(
+  cellId: string,
+  code: string,
+  stepCheck?: StepCheckConfig
+): Promise<NotebookCellResult> {
+  const startTime = performance.now();
+  notebookExecutionCount += 1;
+  const currentExecNum = notebookExecutionCount;
+
   try {
     const pyodide = await getPyodide();
     if (pyodide) {
-      let stdoutBuffer: string[] = [];
-      let stderrBuffer: string[] = [];
+      const stdoutBuffer: string[] = [];
+      const stderrBuffer: string[] = [];
 
       pyodide.setStdout({
         batched: (text: string) => {
@@ -84,7 +135,161 @@ export async function executePythonCode(
         },
       });
 
-      // Prepare input feeding if input() is called
+      pyodide.globals.set('_pycert_cell_code', code);
+      pyodide.globals.set('_pycert_has_check', Boolean(stepCheck));
+      pyodide.globals.set('_pycert_val_code', stepCheck?.validationSnippet || '');
+      pyodide.globals.set('_pycert_diag_expr', stepCheck?.diagnosticExpr || 'None');
+      pyodide.globals.set(
+        '_pycert_expected_str',
+        stepCheck?.expectedExample || 'matching output'
+      );
+
+      const driverResultJson = await pyodide.runPythonAsync(`
+import json as _pycert_json
+import types as _pycert_types
+import traceback as _pycert_tb
+
+if '_pycert_ns' not in globals() or not isinstance(_pycert_ns, dict):
+    _pycert_ns = {}
+
+_cell_err = None
+_check_passed = None
+_check_msg = ""
+
+try:
+    _compiled = compile(_pycert_cell_code, '<notebook_cell>', 'exec')
+    exec(_compiled, _pycert_ns)
+except Exception as _exc:
+    _tb_lines = _pycert_tb.format_exception(type(_exc), _exc, _exc.__traceback__)
+    # Filter internal wrapper frame so students see clean line numbers inside their cell
+    _clean_tb = []
+    for _line in _tb_lines:
+        if 'File "<string>"' in _line:
+            continue
+        _clean_tb.append(_line.replace('File "<notebook_cell>"', 'In cell'))
+    _cell_err = "".join(_clean_tb).strip()
+
+if _cell_err is None and _pycert_has_check and _pycert_val_code:
+    try:
+        exec(compile(_pycert_val_code, '<step_check>', 'exec'), _pycert_ns)
+        _check_passed = True
+        _check_msg = "Step check passed!"
+    except AssertionError:
+        _check_passed = False
+        try:
+            _got_val = eval(_pycert_diag_expr, _pycert_ns)
+            _got_repr = repr(_got_val)
+        except Exception as _inner_exc:
+            _got_repr = f"<{type(_inner_exc).__name__}: {_inner_exc}>"
+        _check_msg = f"Got {_got_repr} (expected {_pycert_expected_str})"
+    except Exception as _chk_exc:
+        _check_passed = False
+        _check_msg = f"{type(_chk_exc).__name__}: {_chk_exc}"
+elif _cell_err is not None and _pycert_has_check:
+    _check_passed = False
+    _check_msg = "Fix the error in this cell above, then re-run."
+
+_vars_out = []
+for _k, _v in _pycert_ns.items():
+    if _k.startswith('_') or _k == '__builtins__':
+        continue
+    _tname = type(_v).__name__
+    if isinstance(_v, _pycert_types.FunctionType):
+        _arg_names = list(_v.__code__.co_varnames[:_v.__code__.co_argcount])
+        _val_preview = f"def {_k}({', '.join(_arg_names)})"
+    elif isinstance(_v, _pycert_types.ModuleType):
+        _val_preview = f"<module '{_v.__name__}'>"
+    else:
+        try:
+            _raw_repr = repr(_v)
+        except Exception:
+            _raw_repr = "<object>"
+        _val_preview = _raw_repr if len(_raw_repr) <= 72 else _raw_repr[:69] + "..."
+    _vars_out.append({"name": _k, "typeName": _tname, "reprValue": _val_preview})
+
+# Sort variables first, functions/modules after, preserving alphabetical order within groups
+_vars_out.sort(key=lambda item: (1 if item["typeName"] in ("function", "module", "type") else 0, item["name"]))
+
+_pycert_json.dumps({
+    "cellError": _cell_err,
+    "checkPassed": _check_passed,
+    "checkMsg": _check_msg,
+    "variables": _vars_out[:24],
+})
+`);
+
+      const parsed = JSON.parse(String(driverResultJson));
+      const durationMs = Math.round(performance.now() - startTime);
+
+      const stderrCombined = [parsed.cellError, ...stderrBuffer].filter(Boolean).join('\n').trim();
+      const isError = Boolean(parsed.cellError) || stderrBuffer.some((s) => s.includes('Error'));
+
+      return {
+        stdout: stdoutBuffer.join('\n'),
+        stderr: stderrCombined,
+        isError,
+        durationMs,
+        engine: 'pyodide-wasm',
+        executionCount: currentExecNum,
+        variables: parsed.variables || [],
+        stepCheck: stepCheck
+          ? {
+              passed: Boolean(parsed.checkPassed),
+              message: parsed.checkMsg || undefined,
+            }
+          : undefined,
+      };
+    }
+  } catch (wasmError: any) {
+    const durationMs = Math.round(performance.now() - startTime);
+    return {
+      stdout: '',
+      stderr: wasmError?.message || String(wasmError),
+      isError: true,
+      durationMs,
+      engine: 'pyodide-wasm',
+      executionCount: currentExecNum,
+      variables: [],
+      stepCheck: stepCheck
+        ? {
+            passed: false,
+            message: 'Execution error occurred in cell.',
+          }
+        : undefined,
+    };
+  }
+
+  // Fallback stateful simulator if Pyodide CDN is unavailable or offline
+  return simulateNotebookCell(cellId, code, currentExecNum, startTime, stepCheck);
+}
+
+/**
+ * Legacy single-script execution helper (preserved for compatibility)
+ */
+export async function executePythonCode(
+  code: string,
+  userInputs: string[] = []
+): Promise<ExecutionResult> {
+  const startTime = performance.now();
+
+  try {
+    const pyodide = await getPyodide();
+    if (pyodide) {
+      const stdoutBuffer: string[] = [];
+      const stderrBuffer: string[] = [];
+
+      pyodide.setStdout({
+        batched: (text: string) => {
+          stdoutBuffer.push(text);
+        },
+      });
+
+      pyodide.setStderr({
+        batched: (text: string) => {
+          stderrBuffer.push(text);
+        },
+      });
+
       let inputIdx = 0;
       pyodide.setStdin({
         stdin: () => {
@@ -108,310 +313,207 @@ export async function executePythonCode(
       };
     }
   } catch (wasmError: any) {
-    // If Pyodide encountered a Python Exception, return the formatted traceback
     const durationMs = Math.round(performance.now() - startTime);
-    const errorMsg = wasmError?.message || String(wasmError);
     return {
       stdout: '',
-      stderr: errorMsg,
+      stderr: wasmError?.message || String(wasmError),
       durationMs,
       engine: 'pyodide-wasm',
       isError: true,
     };
   }
 
-  // Fallback: Instant client-side Python simulator
-  return simulatePythonCode(code, startTime);
+  const fallback = simulateNotebookCell('script', code, 1, startTime);
+  return {
+    stdout: fallback.stdout,
+    stderr: fallback.stderr,
+    durationMs: fallback.durationMs,
+    engine: 'simulated-engine',
+    isError: fallback.isError,
+  };
 }
 
-/**
- * Simulated client execution engine for Python syntax & PCEP fundamentals
- * Handles print formatting (sep, end), basic math operations, loops, lists, dicts, exceptions
- */
-function simulatePythonCode(code: string, startTime: number): ExecutionResult {
-  const outputLines: string[] = [];
-  const errorLines: string[] = [];
+function extractSimVariables(allCode: string): KernelVariable[] {
+  const vars: KernelVariable[] = [];
+  const seen = new Set<string>();
 
-  try {
-    // Context simulated environment
-    const lines = code.split('\n');
-    let printBuffer = '';
-
-    // Simulated standard output writer
-    const customPrint = (...args: any[]) => {
-      // Check for custom kwargs if passed in simulator
-      const strArgs = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a)));
-      printBuffer += strArgs.join(' ') + '\n';
-    };
-
-    // Evaluate basic math and expressions directly
-    // Transform Python syntax to safe JS evaluation for standard syllabus cases
-    let transformed = code
-      // comments
-      .replace(/^(\s*)#(.*)$/gm, '$1//$2')
-      // print kwargs simulation
-      .replace(/print\((.*?)\)/g, (match, content) => {
-        return `__pyPrint(${content})`;
-      })
-      // elif to else if
-      .replace(/\belif\b/g, 'else if')
-      // def func(a, b): to function func(a, b) {
-      .replace(/def\s+([a-zA-Z0-9_]+)\s*\((.*?)\):/g, 'function $1($2) {')
-      // None to null, True to true, False to false
-      .replace(/\bNone\b/g, 'null')
-      .replace(/\bTrue\b/g, 'true')
-      .replace(/\bFalse\b/g, 'false')
-      // Exponentiation operator ** is valid in modern JS
-      // In python // is floor division:
-      .replace(/([0-9a-zA-Z_.]+)\s*\/\/\s*([0-9a-zA-Z_.]+)/g, 'Math.floor(($1)/($2))');
-
-    // Create execution sandbox
-    const sandboxScope: Record<string, any> = {
-      Math,
-      round: (val: number, decimals = 0) => {
-        const factor = Math.pow(10, decimals);
-        return Math.round(val * factor) / factor;
-      },
-      abs: Math.abs,
-      max: (...args: any[]) => (Array.isArray(args[0]) ? Math.max(...args[0]) : Math.max(...args)),
-      min: (...args: any[]) => (Array.isArray(args[0]) ? Math.min(...args[0]) : Math.min(...args)),
-      sum: (arr: number[]) => (Array.isArray(arr) ? arr.reduce((a, b) => a + b, 0) : 0),
-      len: (obj: any) => (obj ? obj.length || Object.keys(obj).length : 0),
-      int: (v: any) => parseInt(v, 10),
-      float: (v: any) => parseFloat(v),
-      str: (v: any) => String(v),
-      list: (v: any) => (Array.isArray(v) ? v : Array.from(v || [])),
-      range: (start: number, stop?: number, step = 1) => {
-        const res: number[] = [];
-        if (stop === undefined) {
-          stop = start;
-          start = 0;
-        }
-        if (step > 0) {
-          for (let i = start; i < stop; i += step) res.push(i);
-        } else if (step < 0) {
-          for (let i = start; i > stop; i += step) res.push(i);
-        }
-        return res;
-      },
-      math: {
-        ceil: Math.ceil,
-        floor: Math.floor,
-        trunc: Math.trunc,
-        sqrt: Math.sqrt,
-        pi: Math.PI,
-      },
-      random: {
-        random: Math.random,
-        choice: (arr: any[]) => arr[Math.floor(Math.random() * arr.length)],
-        sample: (arr: any[], k: number) => {
-          const copy = [...arr];
-          const out = [];
-          for (let i = 0; i < k && copy.length; i++) {
-            const idx = Math.floor(Math.random() * copy.length);
-            out.push(copy.splice(idx, 1)[0]);
-          }
-          return out;
-        },
-      },
-      __pyPrint: (...args: any[]) => {
-        let sep = ' ';
-        let end = '\n';
-        const cleanArgs: any[] = [];
-
-        for (const arg of args) {
-          if (typeof arg === 'string' && arg.startsWith('sep=')) {
-            sep = arg.slice(4).replace(/^["']|["']$/g, '');
-          } else if (typeof arg === 'string' && arg.startsWith('end=')) {
-            end = arg.slice(4).replace(/^["']|["']$/g, '').replace(/\\n/g, '\n');
-          } else {
-            cleanArgs.push(arg);
-          }
-        }
-
-        const formatted = cleanArgs
-          .map((a) => {
-            if (typeof a === 'object' && a !== null) {
-              return JSON.stringify(a).replace(/"([^"]+)":/g, "'$1':");
-            }
-            return String(a);
-          })
-          .join(sep);
-
-        printBuffer += formatted + end;
-      },
-    };
-
-    // Attempt direct sandbox execution
-    try {
-      const keys = Object.keys(sandboxScope);
-      const values = Object.values(sandboxScope);
-      const func = new Function(...keys, transformed);
-      func(...values);
-
-      if (printBuffer.trim()) {
-        outputLines.push(printBuffer.trimEnd());
-      }
-    } catch {
-      // If browser is offline or Pyodide is still warming up, evaluate PCEP lab functions cleanly
-      if (code.includes('__STEP_CHECK__')) {
-        const extractFnBody = (fnName: string): string => {
-          const match = code.match(new RegExp(`def\\s+${fnName}\\s*\\([^)]*\\):([\\s\\S]*?)(?=\\ndef\\s+|\\nif\\s+__name__|\\ntry:|$)`));
-          return match ? match[1] : '';
-        };
-
-        // Lab 1 checks
-        if (code.includes('def celsius_to_fahrenheit')) {
-          const b1 = extractFnBody('celsius_to_fahrenheit');
-          const b2 = extractFnBody('trip_fuel_stops');
-          const b3 = extractFnBody('format_trip_banner');
-          outputLines.push(
-            b1.includes('9') && b1.includes('5') && b1.includes('32') && !b1.includes('fahrenheit = 0.0')
-              ? '__STEP_RESULT__:1:PASS'
-              : '__STEP_RESULT__:1:FAIL:Returned 0.0 — replace 0.0 with (float(celsius) * 9 / 5) + 32'
-          );
-          outputLines.push(
-            b2.includes('//') && b2.includes('%') && !b2.includes('full_stops = 0')
-              ? '__STEP_RESULT__:2:PASS'
-              : '__STEP_RESULT__:2:FAIL:Returned (0, 0) — use // for full_stops and % for leftover_miles'
-          );
-          outputLines.push(
-            (b3.includes('temp_f') && b3.includes('stops') && b3.includes('extra')) && !b3.includes('return ""')
-              ? '__STEP_RESULT__:3:PASS'
-              : '__STEP_RESULT__:3:FAIL:Returned "" — format temp_f, stops, and extra into the banner string'
-          );
-        }
-        // Lab 2 checks
-        else if (code.includes('def get_medal')) {
-          const b1 = extractFnBody('get_medal');
-          const b2 = extractFnBody('launch_countdown');
-          const b3 = extractFnBody('filter_scores');
-          outputLines.push(
-            b1.includes('Gold') && b1.includes('Silver') && b1.includes('Bronze') && b1.includes('if')
-              ? '__STEP_RESULT__:1:PASS'
-              : '__STEP_RESULT__:1:FAIL:Returned "" — add if/elif/else for Gold (90+), Silver (70+), Bronze'
-          );
-          outputLines.push(
-            b2.includes('range') && b2.includes('-1') && !b2.includes('return []')
-              ? '__STEP_RESULT__:2:PASS'
-              : '__STEP_RESULT__:2:FAIL:Returned [] — return list(range(start_num, 0, -1))'
-          );
-          outputLines.push(
-            b3.includes('break') && b3.includes('continue') && b3.includes('append')
-              ? '__STEP_RESULT__:3:PASS'
-              : '__STEP_RESULT__:3:FAIL:Missing break / continue / append inside filter_scores loop'
-          );
-        }
-        // Lab 3 checks
-        else if (code.includes('def get_top_items')) {
-          const b1 = extractFnBody('get_top_items');
-          const b2 = extractFnBody('get_unique_categories');
-          const b3 = extractFnBody('format_price_label');
-          outputLines.push(
-            b1.includes('[:') && !b1.includes('return []')
-              ? '__STEP_RESULT__:1:PASS'
-              : '__STEP_RESULT__:1:FAIL:Returned [] — use list slicing item_codes[:count]'
-          );
-          outputLines.push(
-            b2.includes('.add(') && b2.includes('for')
-              ? '__STEP_RESULT__:2:PASS'
-              : '__STEP_RESULT__:2:FAIL:Returned empty set() — loop through tags and call categories.add(tag)'
-          );
-          outputLines.push(
-            b3.includes('.upper()') && b3.includes('.2f') && !b3.includes('return ""')
-              ? '__STEP_RESULT__:3:PASS'
-              : '__STEP_RESULT__:3:FAIL:Returned "" — format name with .upper() and price with :.2f'
-          );
-        }
-        // Lab 4 checks
-        else if (code.includes('def average_score')) {
-          const b1 = extractFnBody('average_score');
-          const b2 = extractFnBody('safe_divide');
-          outputLines.push(
-            b1.includes('sum(') && b1.includes('len(') && !b1.includes('return 0.0\n')
-              ? '__STEP_RESULT__:1:PASS'
-              : '__STEP_RESULT__:1:FAIL:Returned 0.0 — compute (sum(scores) / len(scores)) + bonus'
-          );
-          outputLines.push(
-            b2.includes('try:') && b2.includes('ZeroDivisionError')
-              ? '__STEP_RESULT__:2:PASS'
-              : '__STEP_RESULT__:2:FAIL:Missing try: / except ZeroDivisionError: block'
-          );
-          outputLines.push(
-            b2.includes('ValueError') && b2.includes('TypeError')
-              ? '__STEP_RESULT__:3:PASS'
-              : '__STEP_RESULT__:3:FAIL:Missing except (ValueError, TypeError): block'
-          );
-        }
-        // Lab 5 checks
-        else if (code.includes('def parse_gradebook')) {
-          const b1 = extractFnBody('parse_gradebook');
-          const b2 = extractFnBody('summarize_scores');
-          const b3 = extractFnBody('pick_raffle_winner');
-          outputLines.push(
-            b1.includes('split(') && b1.includes('float(') && b1.includes('append(')
-              ? '__STEP_RESULT__:1:PASS'
-              : '__STEP_RESULT__:1:FAIL:Returned [] — split CSV lines, cast scores with float(), and append (name, avg)'
-          );
-          outputLines.push(
-            b2.includes('math.ceil') && b2.includes('math.floor')
-              ? '__STEP_RESULT__:2:PASS'
-              : '__STEP_RESULT__:2:FAIL:Returned 0s — use math.ceil(max(averages)) and math.floor(min(averages))'
-          );
-          outputLines.push(
-            b3.includes('random.seed') && b3.includes('random.choice')
-              ? '__STEP_RESULT__:3:PASS'
-              : '__STEP_RESULT__:3:FAIL:Returned "" — call random.seed(42) and return random.choice(names)'
-          );
-        }
-        // Lab 6 (CLI Cipher) checks
-        else if (code.includes('def caesar_cipher')) {
-          const fnBody = extractFnBody('caesar_cipher');
-          const hasShiftFormula = fnBody.includes('chr(') && fnBody.includes('ord(') && fnBody.includes('% 26');
-          const hasJoin = fnBody.includes('"".join(result)') || fnBody.includes("''.join(result)");
-          outputLines.push(
-            hasShiftFormula && hasJoin
-              ? '__STEP_RESULT__:1:PASS'
-              : '__STEP_RESULT__:1:FAIL:Update if char.isupper() with chr((ord(char) - base + shift) % 26 + base) and return "".join(result)'
-          );
-          outputLines.push(
-            (fnBody.match(/% 26/g) || []).length >= 2 && hasJoin
-              ? '__STEP_RESULT__:2:PASS'
-              : '__STEP_RESULT__:2:FAIL:Update elif char.islower() with chr((ord(char) - base + shift) % 26 + base)'
-          );
-          outputLines.push(
-            hasJoin && !fnBody.includes('return ""\n')
-              ? '__STEP_RESULT__:3:PASS'
-              : '__STEP_RESULT__:3:FAIL:Returned "" — replace return "" with return "".join(result)'
-          );
-        }
-      } else if (code.includes('celsius_to_fahrenheit')) {
-        outputLines.push('Road Trip Summary: -> 77.0 F | 2 stops | 50 mi left\n[Done]');
-      } else if (code.includes('filter_scores')) {
-        outputLines.push('Medal for 95: Gold\nCountdown: [5, 4, 3, 2, 1]\nValid scores: [85, 92]');
-      } else if (code.includes('format_price_label')) {
-        outputLines.push("Top 2: ['ITEM-1', 'ITEM-2']\nCategories: {'tech', 'math', 'writing', 'school'}\n[ITEM-1] GRAPHING CALCULATOR: $89.99");
-      } else if (code.includes('average_score')) {
-        outputLines.push('Average with bonus: 92.0\n10 / 2 = 5.0\n10 / 0 = Cannot divide by zero\n10 / abc = Please enter numbers only');
-      } else if (code.includes('parse_gradebook')) {
-        outputLines.push("Parsed gradebook: [('Alice', 91.0), ('Bob', 76.5), ('Charlie', 97.0), ('Diana', 64.5), ('Evan', 85.5)]\nSummary: {'highest_ceil': 97, 'lowest_floor': 64}\nRaffle winner: Charlie");
-      } else if (code.includes('caesar_cipher')) {
-        outputLines.push('Encoded: SBWKRQ\nWith symbols: Mjqqt, Btwqi!\nDecoded: MZBM');
-      } else {
-        outputLines.push('Program evaluated.');
-      }
+  // Extract defined functions
+  const fnMatches = allCode.matchAll(/^\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\):/gm);
+  for (const m of fnMatches) {
+    const name = m[1];
+    if (!seen.has(name)) {
+      seen.add(name);
+      vars.push({ name, typeName: 'function', reprValue: `def ${name}(${m[2]})` });
     }
-  } catch (fatal: any) {
-    errorLines.push(`Python Execution Error: ${fatal?.message || String(fatal)}`);
   }
 
-  const durationMs = Math.round(performance.now() - startTime);
+  // Extract imports
+  const importMatches = allCode.matchAll(/^\s*import\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm);
+  for (const m of importMatches) {
+    const name = m[1];
+    if (!seen.has(name)) {
+      seen.add(name);
+      vars.push({ name, typeName: 'module', reprValue: `<module '${name}'>` });
+    }
+  }
+
+  // Extract top-level simple assignments
+  const assignMatches = allCode.matchAll(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(.+)$/gm);
+  for (const m of assignMatches) {
+    const name = m[1];
+    const rhs = m[2].trim();
+    if (seen.has(name) || name.startsWith('_')) continue;
+    seen.add(name);
+    let typeName = 'object';
+    if (/^-?\d+$/.test(rhs)) typeName = 'int';
+    else if (/^-?\d+\.\d+$/.test(rhs)) typeName = 'float';
+    else if (rhs.startsWith('[') || rhs.startsWith('list(')) typeName = 'list';
+    else if (rhs.startsWith('{') && rhs.includes(':')) typeName = 'dict';
+    else if (rhs.startsWith('set(')) typeName = 'set';
+    else if (rhs.startsWith('"') || rhs.startsWith("'") || rhs.startsWith('f"')) typeName = 'str';
+    const preview = rhs.length > 56 ? rhs.slice(0, 53) + '...' : rhs;
+    vars.push({ name, typeName, reprValue: preview });
+  }
+
+  vars.sort((a, b) => {
+    const aIsCall = a.typeName === 'function' || a.typeName === 'module' ? 1 : 0;
+    const bIsCall = b.typeName === 'function' || b.typeName === 'module' ? 1 : 0;
+    return aIsCall !== bIsCall ? aIsCall - bIsCall : a.name.localeCompare(b.name);
+  });
+
+  return vars.slice(0, 24);
+}
+
+function simulateNotebookCell(
+  cellId: string,
+  code: string,
+  executionCount: number,
+  startTime: number,
+  stepCheck?: StepCheckConfig
+): NotebookCellResult {
+  simCellSources.set(cellId, code);
+  const combinedCode = Array.from(simCellSources.values()).join('\n\n');
+  simExecutionVariables = extractSimVariables(combinedCode);
+
+  const stdoutLines: string[] = [];
+  let checkPassed = true;
+  let checkMsg = 'Step check passed!';
+
+  // Evaluate simple print lines for visual feedback
+  const printMatches = code.matchAll(/print\(([^)]+)\)/g);
+  for (const pm of printMatches) {
+    stdoutLines.push(pm[1].replace(/["']/g, ''));
+  }
+
+  const extractFnBody = (fnName: string): string => {
+    const regex = new RegExp(
+      `def\\s+${fnName}\\s*\\([^)]*\\):([\\s\\S]*?)(?=\\ndef\\s+|\\n[a-zA-Z_]+\\s*=|\\nprint\\(|$)`
+    );
+    const matches = Array.from(combinedCode.matchAll(new RegExp(regex.source, 'g')));
+    return matches.length > 0 ? matches[matches.length - 1][1] : '';
+  };
+
+  if (stepCheck) {
+    const sn = stepCheck.stepNumber;
+    if (combinedCode.includes('def celsius_to_fahrenheit')) {
+      if (sn === 1) {
+        const b1 = extractFnBody('celsius_to_fahrenheit');
+        checkPassed = b1.includes('9') && b1.includes('5') && b1.includes('32') && !b1.includes('fahrenheit = 0.0');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got 0.0 — replace 0.0 with (float(celsius) * 9 / 5) + 32';
+      } else if (sn === 2) {
+        const b2 = extractFnBody('trip_fuel_stops');
+        checkPassed = b2.includes('//') && b2.includes('%') && !b2.includes('full_stops = 0');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got (0, 0) — use // for full_stops and % for leftover_miles';
+      } else if (sn === 3) {
+        const b3 = extractFnBody('format_trip_banner');
+        checkPassed = b3.includes('temp_f') && b3.includes('stops') && b3.includes('extra') && !b3.includes('return ""');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got "" — format temp_f, stops, and extra into the banner string';
+      }
+    } else if (combinedCode.includes('def get_medal')) {
+      if (sn === 1) {
+        const b1 = extractFnBody('get_medal');
+        checkPassed = b1.includes('Gold') && b1.includes('Silver') && b1.includes('Bronze') && b1.includes('if');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got "" — add if/elif/else for Gold (90+), Silver (70+), Bronze';
+      } else if (sn === 2) {
+        const b2 = extractFnBody('launch_countdown');
+        checkPassed = b2.includes('range') && b2.includes('-1') && !b2.includes('return []');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got [] — return list(range(start_num, 0, -1))';
+      } else if (sn === 3) {
+        const b3 = extractFnBody('filter_scores');
+        checkPassed = b3.includes('break') && b3.includes('continue') && b3.includes('append');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Missing break / continue / append inside filter_scores loop';
+      }
+    } else if (combinedCode.includes('def get_top_items')) {
+      if (sn === 1) {
+        const b1 = extractFnBody('get_top_items');
+        checkPassed = b1.includes('[:') && !b1.includes('return []');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got [] — use list slicing item_codes[:count]';
+      } else if (sn === 2) {
+        const b2 = extractFnBody('get_unique_categories');
+        checkPassed = b2.includes('.add(') && b2.includes('for');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got empty set() — loop through tags and call categories.add(tag)';
+      } else if (sn === 3) {
+        const b3 = extractFnBody('format_price_label');
+        checkPassed = b3.includes('.upper()') && b3.includes('.2f') && !b3.includes('return ""');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got "" — format name with .upper() and price with :.2f';
+      }
+    } else if (combinedCode.includes('def average_score')) {
+      if (sn === 1) {
+        const b1 = extractFnBody('average_score');
+        checkPassed = b1.includes('sum(') && b1.includes('len(') && !b1.includes('return 0.0\n');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got 0.0 — compute (sum(scores) / len(scores)) + bonus';
+      } else if (sn === 2) {
+        const b2 = extractFnBody('safe_divide');
+        checkPassed = b2.includes('try:') && b2.includes('ZeroDivisionError');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Missing try: / except ZeroDivisionError: block';
+      } else if (sn === 3) {
+        const b3 = extractFnBody('safe_divide');
+        checkPassed = b3.includes('ValueError') && b3.includes('TypeError');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Missing except (ValueError, TypeError): block';
+      }
+    } else if (combinedCode.includes('def parse_gradebook')) {
+      if (sn === 1) {
+        const b1 = extractFnBody('parse_gradebook');
+        checkPassed = b1.includes('split(') && b1.includes('float(') && b1.includes('append(');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got [] — split CSV lines, cast scores with float(), and append (name, avg)';
+      } else if (sn === 2) {
+        const b2 = extractFnBody('summarize_scores');
+        checkPassed = b2.includes('math.ceil') && b2.includes('math.floor');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got 0s — use math.ceil(max(averages)) and math.floor(min(averages))';
+      } else if (sn === 3) {
+        const b3 = extractFnBody('pick_raffle_winner');
+        checkPassed = b3.includes('random.seed') && b3.includes('random.choice');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Got "" — call random.seed(42) and return random.choice(names)';
+      }
+    } else if (combinedCode.includes('def caesar_cipher')) {
+      const fnBody = extractFnBody('caesar_cipher');
+      if (sn === 1) {
+        checkPassed = fnBody.includes('chr(') && fnBody.includes('ord(') && fnBody.includes('% 26');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Replace char with chr((ord(char) - base + shift) % 26 + base)';
+      } else if (sn === 2) {
+        checkPassed = (fnBody.match(/% 26/g) || []).length >= 2;
+        checkMsg = checkPassed ? 'Step check passed!' : 'Update elif char.islower() with chr((ord(char) - base + shift) % 26 + base)';
+      } else if (sn === 3) {
+        const b3 = extractFnBody('decode_cipher');
+        checkPassed = b3.includes('caesar_cipher(') && b3.includes('-shift');
+        checkMsg = checkPassed ? 'Step check passed!' : 'Return caesar_cipher(text, -shift) inside decode_cipher';
+      }
+    }
+  }
 
   return {
-    stdout: outputLines.join('\n'),
-    stderr: errorLines.join('\n'),
-    durationMs,
+    stdout: stdoutLines.join('\n') || 'Cell evaluated (offline simulator mode).',
+    stderr: '',
+    isError: false,
+    durationMs: Math.round(performance.now() - startTime),
     engine: 'simulated-engine',
-    isError: errorLines.length > 0,
+    executionCount,
+    variables: simExecutionVariables,
+    stepCheck: stepCheck
+      ? {
+          passed: checkPassed,
+          message: checkMsg,
+        }
+      : undefined,
   };
 }

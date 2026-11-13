@@ -12,6 +12,9 @@ interface ProgressContextType {
   currentProject: MicroProject;
   currentCode: string;
   setCurrentCode: (code: string) => void;
+  getCellCode: (cellId: string) => string;
+  setCellCode: (cellId: string, code: string) => void;
+  resetCellCode: (cellId: string) => void;
   resetProjectCode: () => void;
   currentStepIndex: number;
   setCurrentStepIndex: (stepIdx: number) => void;
@@ -50,7 +53,7 @@ interface ProgressContextType {
 }
 
 const STORAGE_KEY = 'pycert_user_progress_v1';
-const CURRICULUM_VERSION = 3;
+const CURRICULUM_VERSION = 4;
 
 function computeStreak(activityHistory: string[]): { currentStreak: number; hasPracticedToday: boolean } {
   if (!activityHistory || activityHistory.length === 0) {
@@ -114,6 +117,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Initialize state with localStorage or defaults
   const [completedStepsMap, setCompletedStepsMap] = useState<Record<string, number[]>>({});
   const [codeSnapshots, setCodeSnapshots] = useState<Record<string, string>>({});
+  const [cellSnapshots, setCellSnapshots] = useState<Record<string, Record<string, string>>>({});
   const [flashcards, setFlashcards] = useState<Flashcard[]>(INITIAL_FLASHCARDS);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(INITIAL_CHECKLIST_ITEMS);
   const [quizHistory, setQuizHistory] = useState<UserProgressState['quizHistory']>([]);
@@ -156,6 +160,11 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setCodeSnapshots(parsed.codeSnapshots);
         } else {
           setCodeSnapshots({});
+        }
+        if (parsed.cellSnapshots && parsed.curriculumVersion === CURRICULUM_VERSION) {
+          setCellSnapshots(parsed.cellSnapshots);
+        } else {
+          setCellSnapshots({});
         }
         if (parsed.flashcards) {
           const mergedFlashcards = parsed.flashcards.map((f: Flashcard) => {
@@ -200,6 +209,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           curriculumVersion: CURRICULUM_VERSION,
           completedStepsMap,
           codeSnapshots,
+          cellSnapshots,
           flashcards,
           checklistItems,
           quizHistory,
@@ -211,7 +221,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (e) {
       console.warn('Failed to save progress to localStorage', e);
     }
-  }, [completedStepsMap, codeSnapshots, flashcards, checklistItems, quizHistory, darkMode, currentUser, streakData]);
+  }, [completedStepsMap, codeSnapshots, cellSnapshots, flashcards, checklistItems, quizHistory, darkMode, currentUser, streakData]);
 
   // Keep dark class on documentElement
   useEffect(() => {
@@ -225,7 +235,40 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const currentProject =
     MICRO_PROJECTS.find((p) => p.id === selectedProjectId) || MICRO_PROJECTS[0];
 
-  const currentCode = codeSnapshots[selectedProjectId] ?? currentProject.starterCode;
+  const getCellCode = (cellId: string): string => {
+    const saved = cellSnapshots[selectedProjectId]?.[cellId];
+    if (typeof saved === 'string') return saved;
+    const cellDef = currentProject.notebookCells?.find((c) => c.id === cellId);
+    return cellDef ? cellDef.starterCode : '';
+  };
+
+  const setCellCode = (cellId: string, code: string) => {
+    setCellSnapshots((prev) => ({
+      ...prev,
+      [selectedProjectId]: {
+        ...(prev[selectedProjectId] || {}),
+        [cellId]: code,
+      },
+    }));
+  };
+
+  const resetCellCode = (cellId: string) => {
+    const cellDef = currentProject.notebookCells?.find((c) => c.id === cellId);
+    if (!cellDef) return;
+    setCellSnapshots((prev) => ({
+      ...prev,
+      [selectedProjectId]: {
+        ...(prev[selectedProjectId] || {}),
+        [cellId]: cellDef.starterCode,
+      },
+    }));
+  };
+
+  const currentCode =
+    currentProject.notebookCells && currentProject.notebookCells.length > 0
+      ? currentProject.notebookCells.map((c) => getCellCode(c.id)).join('\n\n')
+      : (codeSnapshots[selectedProjectId] ?? currentProject.starterCode);
+
   const completedSteps = completedStepsMap[selectedProjectId] ?? [];
 
   const setCurrentCode = (code: string) => {
@@ -240,6 +283,11 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       ...prev,
       [selectedProjectId]: currentProject.starterCode,
     }));
+    setCellSnapshots((prev) => {
+      const next = { ...prev };
+      delete next[selectedProjectId];
+      return next;
+    });
   };
 
   const selectProject = (projectId: string) => {
@@ -403,6 +451,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const resetAllProgress = () => {
     setCompletedStepsMap({});
     setCodeSnapshots({});
+    setCellSnapshots({});
     setFlashcards(INITIAL_FLASHCARDS);
     setChecklistItems(INITIAL_CHECKLIST_ITEMS);
     setQuizHistory([]);
@@ -414,6 +463,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           curriculumVersion: CURRICULUM_VERSION,
           completedStepsMap: {},
           codeSnapshots: {},
+          cellSnapshots: {},
           flashcards: INITIAL_FLASHCARDS,
           checklistItems: INITIAL_CHECKLIST_ITEMS,
           quizHistory: [],
@@ -504,6 +554,9 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         currentProject,
         currentCode,
         setCurrentCode,
+        getCellCode,
+        setCellCode,
+        resetCellCode,
         resetProjectCode,
         currentStepIndex,
         setCurrentStepIndex,

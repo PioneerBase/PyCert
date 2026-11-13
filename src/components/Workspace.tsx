@@ -1,8 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useProgress } from '../context/ProgressContext';
 import { MICRO_PROJECTS } from '../data/pcepCurriculum';
-import { ProjectStep } from '../types';
-import { executePythonCode, ExecutionResult } from '../services/pythonRunner';
+import { KernelVariable, NotebookCell, ProjectStep } from '../types';
+import {
+  executeNotebookCell,
+  resetNotebookKernel,
+  NotebookCellResult,
+} from '../services/pythonRunner';
 import { BreadcrumbsDrawer } from './BreadcrumbsDrawer';
 import {
   Play,
@@ -12,23 +16,29 @@ import {
   Copy,
   Check,
   AlertTriangle,
-  Trash2,
   FlaskConical,
-  FileCode,
-  FileText,
   GitCommit,
   ArrowRight,
-  ListChecks,
   BookOpen,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  Terminal,
+  Database,
 } from 'lucide-react';
 
-interface StepTestStatus {
-  stepNumber: number;
-  name: string;
-  assertionText: string;
-  expectedExample?: string;
-  passed: boolean | null;
-  failureMessage?: string;
+interface CellRuntimeState {
+  executionCount: number | null;
+  stdout: string;
+  stderr: string;
+  isError: boolean;
+  durationMs: number;
+  engine: 'pyodide-wasm' | 'simulated-engine';
+  variables: KernelVariable[];
+  stepCheck?: {
+    passed: boolean;
+    message?: string;
+  };
 }
 
 export const Workspace: React.FC = () => {
@@ -36,62 +46,192 @@ export const Workspace: React.FC = () => {
     currentProject,
     selectProject,
     currentCode,
-    setCurrentCode,
+    getCellCode,
+    setCellCode,
+    resetCellCode,
     resetProjectCode,
     currentStepIndex,
     setCurrentStepIndex,
     markStepComplete,
     completedSteps,
     setActiveView,
-    currentUser,
   } = useProgress();
 
-  const [activeTab, setActiveTab] = useState<'source' | 'tests' | 'hints'>('source');
-  const [outputTab, setOutputTab] = useState<'repl' | 'test'>('repl');
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [isRunningTests, setIsRunningTests] = useState<boolean>(false);
-  const [checkingStepNum, setCheckingStepNum] = useState<number | null>(null);
-  const [terminalOutput, setTerminalOutput] = useState<string>(
-    '>>> Ready. Follow Step 1 -> Step 2 -> Step 3 on the left, then click "Check Step" or "Run Tests".\n'
-  );
-  const [executionMeta, setExecutionMeta] = useState<{
-    engine: string;
-    durationMs: number;
-    isError: boolean;
-  } | null>(null);
+  const [cellResults, setCellResults] = useState<Record<string, CellRuntimeState>>({});
+  const [runningCellId, setRunningCellId] = useState<string | null>(null);
+  const [isRunningAll, setIsRunningAll] = useState<boolean>(false);
+  const [isKernelResetting, setIsKernelResetting] = useState<boolean>(false);
+  const [openPatterns, setOpenPatterns] = useState<Record<string, boolean>>({});
+  const [copiedCellId, setCopiedCellId] = useState<string | null>(null);
   const [isBreadcrumbsOpen, setIsBreadcrumbsOpen] = useState<boolean>(false);
-  const [copiedCode, setCopiedCode] = useState<boolean>(false);
-  const [stepTestMap, setStepTestMap] = useState<Record<number, { passed: boolean; failureMessage?: string }>>({});
+  const [kernelBannerMsg, setKernelBannerMsg] = useState<string | null>(null);
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const gutterRef = useRef<HTMLDivElement>(null);
-  const terminalContainerRef = useRef<HTMLDivElement>(null);
+  const cellTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
-  const currentStep = currentProject.steps[currentStepIndex] || currentProject.steps[0];
-  const fileName = currentProject.fileName || `${currentProject.id.replace(/-/g, '_')}.py`;
-  const testFileName = currentProject.testFileName || `test_${fileName}`;
+  const cells: NotebookCell[] = currentProject.notebookCells || [
+    {
+      id: 'main',
+      kind: 'step',
+      stepNumber: 1,
+      title: currentProject.title,
+      starterCode: currentProject.starterCode,
+      solutionCode: currentProject.solutionCode,
+    },
+  ];
 
-  // Reset test display state when switching projects
+  const currentStep: ProjectStep =
+    currentProject.steps[currentStepIndex] || currentProject.steps[0];
+
+  // Reset shared Python kernel & clear stale inline cell outputs whenever switching labs
   useEffect(() => {
-    setStepTestMap({});
-    setActiveTab('source');
-    setTerminalOutput(
-      `>>> Loaded "${currentProject.title}" (${fileName}).\n>>> Start with Step 1 on the left: read the Worked Pattern, edit ${fileName}, then click "Check Step 1".\n`
-    );
-  }, [currentProject.id, currentProject.title, fileName]);
+    let active = true;
+    setCellResults({});
+    setRunningCellId(null);
+    setIsRunningAll(false);
+    setKernelBannerMsg(null);
 
-  // Auto-scroll only inside the terminal box without moving the main page viewport
-  useEffect(() => {
-    if (terminalContainerRef.current) {
-      terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight;
+    // Open the first incomplete step's worked pattern by default
+    const firstStepCell = cells.find((c) => c.kind === 'step');
+    if (firstStepCell) {
+      setOpenPatterns({ [firstStepCell.id]: true });
+    } else {
+      setOpenPatterns({});
     }
-  }, [terminalOutput]);
 
-  const codeLines = currentCode.split('\n');
-  const gutterLineCount = Math.max(28, codeLines.length + 12);
+    resetNotebookKernel().then(() => {
+      if (active) {
+        setKernelBannerMsg('Fresh shared Python kernel ready for this lab.');
+      }
+    });
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const textarea = textareaRef.current;
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProject.id]);
+
+  const getStepForCell = (cell: NotebookCell): ProjectStep | undefined => {
+    if (cell.kind !== 'step' || !cell.stepNumber) return undefined;
+    return currentProject.steps.find((s) => s.stepNumber === cell.stepNumber);
+  };
+
+  const applyExecutionResult = (
+    cell: NotebookCell,
+    result: NotebookCellResult,
+    step?: ProjectStep
+  ) => {
+    setCellResults((prev) => ({
+      ...prev,
+      [cell.id]: {
+        executionCount: result.executionCount,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        isError: result.isError,
+        durationMs: result.durationMs,
+        engine: result.engine,
+        variables: result.variables,
+        stepCheck: result.stepCheck,
+      },
+    }));
+
+    if (step && result.stepCheck?.passed) {
+      markStepComplete(step.stepNumber);
+    }
+  };
+
+  const handleRunCell = async (cell: NotebookCell, focusNext: boolean = false) => {
+    if (isRunningAll) return;
+    setRunningCellId(cell.id);
+    setKernelBannerMsg(null);
+
+    const step = getStepForCell(cell);
+    if (step) {
+      const idx = currentProject.steps.findIndex((s) => s.stepNumber === step.stepNumber);
+      if (idx >= 0) setCurrentStepIndex(idx);
+    }
+
+    const code = getCellCode(cell.id);
+    const result = await executeNotebookCell(
+      cell.id,
+      code,
+      step
+        ? {
+            stepNumber: step.stepNumber,
+            validationSnippet: step.validationSnippet,
+            diagnosticExpr: step.diagnosticExpr,
+            expectedExample: step.expectedExample,
+          }
+        : undefined
+    );
+
+    applyExecutionResult(cell, result, step);
+    setRunningCellId(null);
+
+    if (focusNext) {
+      const curIdx = cells.findIndex((c) => c.id === cell.id);
+      if (curIdx >= 0 && curIdx < cells.length - 1) {
+        const nextCell = cells[curIdx + 1];
+        requestAnimationFrame(() => {
+          cellTextareaRefs.current[nextCell.id]?.focus();
+        });
+      }
+    }
+  };
+
+  const handleRunAllCells = async () => {
+    if (isRunningAll || runningCellId) return;
+    setIsRunningAll(true);
+    setCellResults({});
+    setKernelBannerMsg('Restarted shared kernel · Running all cells top to bottom...');
+
+    await resetNotebookKernel();
+
+    for (const cell of cells) {
+      setRunningCellId(cell.id);
+      const step = getStepForCell(cell);
+      const code = getCellCode(cell.id);
+      const result = await executeNotebookCell(
+        cell.id,
+        code,
+        step
+          ? {
+              stepNumber: step.stepNumber,
+              validationSnippet: step.validationSnippet,
+              diagnosticExpr: step.diagnosticExpr,
+              expectedExample: step.expectedExample,
+            }
+          : undefined
+      );
+      applyExecutionResult(cell, result, step);
+    }
+
+    setRunningCellId(null);
+    setIsRunningAll(false);
+    setKernelBannerMsg('All cells executed top to bottom in the shared kernel.');
+  };
+
+  const handleRestartKernel = async () => {
+    if (isRunningAll || runningCellId) return;
+    setIsKernelResetting(true);
+    await resetNotebookKernel();
+    setCellResults({});
+    setIsKernelResetting(false);
+    setKernelBannerMsg('Kernel restarted. Live variables cleared (your code is preserved).');
+  };
+
+  const handleResetLab = async () => {
+    if (isRunningAll || runningCellId) return;
+    resetProjectCode();
+    await resetNotebookKernel();
+    setCellResults({});
+    setKernelBannerMsg('All cells restored to starter code and kernel restarted.');
+  };
+
+  const handleCellKeyDown = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>,
+    cell: NotebookCell
+  ) => {
+    const textarea = cellTextareaRefs.current[cell.id];
     if (!textarea) return;
 
     if (e.key === 'Tab') {
@@ -99,15 +239,18 @@ export const Workspace: React.FC = () => {
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
       const value = textarea.value;
-
       const newValue = value.substring(0, start) + '    ' + value.substring(end);
-      setCurrentCode(newValue);
-
+      setCellCode(cell.id, newValue);
       requestAnimationFrame(() => {
         textarea.selectionStart = textarea.selectionEnd = start + 4;
       });
-    } else if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
-      // Preserve Python indentation naturally on Enter
+    } else if (e.key === 'Enter' && e.shiftKey) {
+      e.preventDefault();
+      handleRunCell(cell, true);
+    } else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleRunCell(cell, false);
+    } else if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
       const value = textarea.value;
@@ -120,221 +263,36 @@ export const Workspace: React.FC = () => {
       e.preventDefault();
       const insertion = '\n' + currentIndent + extraIndent;
       const newValue = value.substring(0, start) + insertion + value.substring(end);
-      setCurrentCode(newValue);
-
+      setCellCode(cell.id, newValue);
       requestAnimationFrame(() => {
         const nextPos = start + insertion.length;
         textarea.selectionStart = textarea.selectionEnd = nextPos;
       });
-    } else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      handleRunTests();
     }
   };
 
-  const handleRunCode = async () => {
-    setIsRunning(true);
-    setOutputTab('repl');
-    setTerminalOutput((prev) => prev + `\n$ python ${fileName}\n`);
-
-    const result: ExecutionResult = await executePythonCode(currentCode);
-
-    let output = '';
-    if (result.stdout) {
-      output += result.stdout + '\n';
-    }
-    if (result.stderr) {
-      output += `\n[Error Traceback]:\n${result.stderr}\n`;
-    }
-    if (!result.stdout && !result.stderr) {
-      output += '(Program finished with no printed output.)\n';
-    }
-
-    setTerminalOutput((prev) => prev + output);
-    setExecutionMeta({
-      engine: result.engine,
-      durationMs: result.durationMs,
-      isError: result.isError,
-    });
-    setIsRunning(false);
+  const handleCopyCell = (cellId: string) => {
+    navigator.clipboard.writeText(getCellCode(cellId));
+    setCopiedCellId(cellId);
+    setTimeout(() => setCopiedCellId(null), 1800);
   };
 
-  const buildStepCheckPython = (step: ProjectStep) => {
-    const escapedSnippet = step.validationSnippet.replace(/\\/g, '\\\\');
-    const actualExpr = step.diagnosticExpr || 'None';
-    return `try:
-    ${escapedSnippet.split('\n').join('\n    ')}
-    print("__STEP_RESULT__:${step.stepNumber}:PASS")
-except AssertionError:
-    try:
-        _got = repr(${actualExpr})
-    except Exception as _inner:
-        _got = f"<error: {_inner}>"
-    print(f"__STEP_RESULT__:${step.stepNumber}:FAIL:Got {_got} (expected ${step.expectedExample ? step.expectedExample.replace(/"/g, "'") : 'matching output'})")
-except Exception as _err:
-    print(f"__STEP_RESULT__:${step.stepNumber}:FAIL:{type(_err).__name__}: {_err}")`;
-  };
-
-  const handleRunSingleStep = async (step: ProjectStep) => {
-    setCheckingStepNum(step.stepNumber);
-    setOutputTab('test');
-
-    const testRunnerScript = `# __STEP_CHECK__
-${currentCode}
-
-${buildStepCheckPython(step)}
-`;
-
-    const execResult = await executePythonCode(testRunnerScript);
-    const stdoutLines = (execResult.stdout || '').split('\n');
-    const markerPrefix = `__STEP_RESULT__:${step.stepNumber}:`;
-    const matchedLine = stdoutLines.find((line) => line.startsWith(markerPrefix));
-
-    if (matchedLine && matchedLine.includes(':PASS')) {
-      setStepTestMap((prev) => ({
-        ...prev,
-        [step.stepNumber]: { passed: true },
-      }));
-      markStepComplete(step.stepNumber);
-      setTerminalOutput(
-        (prev) =>
-          prev +
-          `\n$ check step_${step.stepNumber} (${fileName})\n[PASS] Step ${step.stepNumber}: ${step.title}\n`
-      );
-    } else {
-      const msg =
-        matchedLine && matchedLine.includes(':FAIL:')
-          ? matchedLine.split(':FAIL:')[1]
-          : execResult.isError && execResult.stderr
-          ? execResult.stderr.split('\n').slice(-2).join(' ')
-          : 'Output does not match expected check yet.';
-
-      setStepTestMap((prev) => ({
-        ...prev,
-        [step.stepNumber]: { passed: false, failureMessage: msg },
-      }));
-      setTerminalOutput(
-        (prev) =>
-          prev +
-          `\n$ check step_${step.stepNumber} (${fileName})\n[TRY AGAIN] Step ${step.stepNumber}: ${msg}\n`
-      );
-    }
-
-    setExecutionMeta({
-      engine: execResult.engine,
-      durationMs: execResult.durationMs,
-      isError: execResult.isError,
-    });
-    setCheckingStepNum(null);
-  };
-
-  const handleRunTests = async () => {
-    setIsRunningTests(true);
-    setOutputTab('test');
-
-    // Build dynamic Python step-by-step test runner from currentProject.steps
-    const stepChecksPython = currentProject.steps.map(buildStepCheckPython).join('\n\n');
-
-    const testRunnerScript = `# __STEP_CHECK__
-${currentCode}
-
-${stepChecksPython}
-`;
-
-    const execResult = await executePythonCode(testRunnerScript);
-    const stdoutLines = (execResult.stdout || '').split('\n');
-
-    const newMap: Record<number, { passed: boolean; failureMessage?: string }> = {};
-    let passedCount = 0;
-
-    currentProject.steps.forEach((step) => {
-      const markerPrefix = `__STEP_RESULT__:${step.stepNumber}:`;
-      const matchedLine = stdoutLines.find((line) => line.startsWith(markerPrefix));
-
-      if (matchedLine && matchedLine.includes(':PASS')) {
-        newMap[step.stepNumber] = { passed: true };
-        passedCount++;
-        markStepComplete(step.stepNumber);
-      } else if (matchedLine && matchedLine.includes(':FAIL:')) {
-        const msg = matchedLine.split(':FAIL:')[1] || 'Check did not match expected output yet.';
-        newMap[step.stepNumber] = { passed: false, failureMessage: msg };
-      } else if (execResult.isError && execResult.stderr) {
-        newMap[step.stepNumber] = {
-          passed: false,
-          failureMessage: execResult.stderr.split('\n').slice(-2).join(' '),
-        };
-      } else {
-        newMap[step.stepNumber] = {
-          passed: false,
-          failureMessage: 'Function output does not match expected check yet.',
-        };
-      }
-    });
-
-    setStepTestMap(newMap);
-
-    const handleName = currentUser.githubHandle || 'student';
-    const reportLines = currentProject.steps.map((step) => {
-      const status = newMap[step.stepNumber];
-      const badge = status?.passed ? 'PASSED' : 'FAILED';
-      const detail = !status?.passed && status?.failureMessage ? `\n   -> Hint: ${status.failureMessage}` : '';
-      return `Step ${step.stepNumber}: ${step.title} ... ${badge}${detail}`;
-    });
-
-    const summaryFooter =
-      passedCount === currentProject.steps.length
-        ? `=== All ${passedCount}/${currentProject.steps.length} steps passed! Ready to Commit or move to the next lab. ===`
-        : `=== ${passedCount}/${currentProject.steps.length} steps passed. Check the failed step(s) above or click "Need Hint". ===`;
-
-    const formattedPytest = `
-$ pytest -v ${testFileName} (user: ${handleName})
-----------------------------------------------------------------------
-${reportLines.join('\n')}
-----------------------------------------------------------------------
-${summaryFooter}
-`;
-
-    setTerminalOutput((prev) => prev + '\n' + formattedPytest);
-    setExecutionMeta({
-      engine: execResult.engine,
-      durationMs: execResult.durationMs,
-      isError: execResult.isError,
-    });
-    setIsRunningTests(false);
-  };
-
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(currentCode);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
-  };
-
-  const handleLoadSolution = () => {
-    setCurrentCode(currentProject.solutionCode);
-    setTerminalOutput((prev) => prev + `\n>>> Loaded reference solution for ${fileName}. Click "Run Tests" to verify!\n`);
+  const handleLoadCellSolution = (cell: NotebookCell) => {
+    setCellCode(cell.id, cell.solutionCode);
   };
 
   const completedCount = completedSteps.length;
   const totalSteps = currentProject.steps.length;
   const progressPct = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
 
-  const testCards: StepTestStatus[] = currentProject.steps.map((step) => {
-    const runState = stepTestMap[step.stepNumber];
-    const isAlreadyCompleted = completedSteps.includes(step.stepNumber);
-    return {
-      stepNumber: step.stepNumber,
-      name: `test_step_${step.stepNumber}`,
-      assertionText: step.validationSnippet,
-      expectedExample: step.expectedExample,
-      passed: runState ? runState.passed : isAlreadyCompleted ? true : null,
-      failureMessage: runState?.failureMessage,
-    };
-  });
-
-  const testsPassedCount = testCards.filter((t) => t.passed === true).length;
+  const currentLabIdx = MICRO_PROJECTS.findIndex((p) => p.id === currentProject.id);
+  const nextLab =
+    currentLabIdx >= 0 && currentLabIdx < MICRO_PROJECTS.length - 1
+      ? MICRO_PROJECTS[currentLabIdx + 1]
+      : null;
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-5 animate-in fade-in duration-150">
+    <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-6 space-y-6 animate-in fade-in duration-150">
       {/* Top Domain Lab Switcher Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[#BDC3C7]/60 dark:border-[#2C3E50] pb-3 text-xs">
         <div className="flex items-center gap-2 flex-wrap">
@@ -366,17 +324,19 @@ ${summaryFooter}
         </div>
       </div>
 
-      {/* Lab Header Row */}
-      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-        <div className="space-y-1">
+      {/* Notebook Header & Shared Kernel Controls */}
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
+        <div className="space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap text-xs font-mono text-[#1E3A78] dark:text-[#BDC3C7]">
             <span className="font-bold">
               Domain {currentProject.sectionNumber}: {currentProject.sectionName}
             </span>
             <span aria-hidden="true">·</span>
             <span>Objectives {currentProject.specificObjectives.join(', ')}</span>
+            <span aria-hidden="true">·</span>
+            <span>Interactive Python Notebook</span>
           </div>
-          <h1 className="text-2xl font-extrabold text-[#2C3E50] dark:text-[#F5F5DC] tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#2C3E50] dark:text-[#F5F5DC] tracking-tight">
             {currentProject.title}
           </h1>
           <p className="text-xs sm:text-sm text-[#2C3E50]/80 dark:text-[#BDC3C7] max-w-3xl leading-relaxed">
@@ -384,50 +344,48 @@ ${summaryFooter}
           </p>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <div className="px-3 py-2 rounded-lg bg-[#FAF9F5] dark:bg-[#1A2634] border border-[#BDC3C7] dark:border-[#2C3E50] text-xs font-mono font-semibold text-[#2C3E50] dark:text-[#F5F5DC] tabular-nums">
+        {/* Notebook Kernel Action Bar */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="px-3 py-2 rounded-lg bg-[#FAF9F5] dark:bg-[#1A2634] border border-[#BDC3C7] dark:border-[#2C3E50] text-xs font-mono font-semibold text-[#2C3E50] dark:text-[#F5F5DC] tabular-nums whitespace-nowrap">
             Progress: <strong className="text-[#1E3A78] dark:text-amber-300">{progressPct}% ({completedCount}/{totalSteps})</strong>
           </div>
 
           <button
-            onClick={() => setIsBreadcrumbsOpen(true)}
-            className="px-3.5 py-2 rounded-lg text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-[#FAF9F5] dark:bg-[#1A2634] hover:bg-[#EBE9DF] dark:hover:bg-[#243342] border border-[#BDC3C7] dark:border-[#2C3E50] shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            type="button"
+            onClick={handleRunAllCells}
+            disabled={isRunningAll || Boolean(runningCellId)}
+            className="px-4 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
           >
-            <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-            <span>Need Hint</span>
+            <Play className="w-3.5 h-3.5" />
+            <span>{isRunningAll ? 'Running Notebook...' : 'Run All Cells'}</span>
           </button>
 
           <button
-            onClick={resetProjectCode}
-            className="px-3 py-2 rounded-lg text-xs font-semibold text-[#2C3E50]/80 dark:text-[#BDC3C7] hover:text-[#2C3E50] dark:hover:text-[#F5F5DC] bg-[#FAF9F5] dark:bg-[#1A2634] hover:bg-[#EBE9DF] dark:hover:bg-[#243342] border border-[#BDC3C7] dark:border-[#2C3E50] transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-            title="Reset to Starter Code"
+            type="button"
+            onClick={handleRestartKernel}
+            disabled={isRunningAll || isKernelResetting || Boolean(runningCellId)}
+            className="px-3 py-2 rounded-lg text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-[#FAF9F5] dark:bg-[#1A2634] hover:bg-[#EBE9DF] dark:hover:bg-[#243342] border border-[#BDC3C7] dark:border-[#2C3E50] transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+            title="Clear shared Python variables without deleting your code"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isKernelResetting ? 'animate-spin' : ''}`} />
+            <span>Restart Kernel</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleResetLab}
+            disabled={isRunningAll || Boolean(runningCellId)}
+            className="px-3 py-2 rounded-lg text-xs font-semibold text-[#2C3E50]/80 dark:text-[#BDC3C7] hover:text-[#2C3E50] dark:hover:text-[#F5F5DC] bg-[#FAF9F5] dark:bg-[#1A2634] hover:bg-[#EBE9DF] dark:hover:bg-[#243342] border border-[#BDC3C7] dark:border-[#2C3E50] transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+            title="Reset all cells in this lab to starter code"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Code</span>
+            <span>Reset Lab</span>
           </button>
 
           <button
-            onClick={handleRunCode}
-            disabled={isRunning}
-            className="px-4 py-2 rounded-lg text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-white dark:bg-[#243342] hover:bg-[#EBE9DF] dark:hover:bg-[#2C3E50] border border-[#BDC3C7] dark:border-[#2C3E50] shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap"
-          >
-            <Play className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>{isRunning ? 'Running...' : 'Run Code'}</span>
-          </button>
-
-          <button
-            onClick={handleRunTests}
-            disabled={isRunningTests}
-            className="px-4 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap"
-          >
-            <FlaskConical className={`w-3.5 h-3.5 ${isRunningTests ? 'animate-spin' : ''}`} />
-            <span>{isRunningTests ? 'Checking...' : 'Run Tests (Ctrl+Enter)'}</span>
-          </button>
-
-          <button
+            type="button"
             onClick={() => setActiveView('portfolio')}
-            className="px-3.5 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#5A1827] hover:bg-[#48121E] dark:bg-[#6B1D2F] dark:hover:bg-[#541624] shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            className="px-3.5 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#5A1827] hover:bg-[#48121E] dark:bg-[#6B1D2F] dark:hover:bg-[#541624] shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
           >
             <GitCommit className="w-3.5 h-3.5" />
             <span>Portfolio</span>
@@ -435,446 +393,481 @@ ${summaryFooter}
         </div>
       </div>
 
-      {/* Main Dual-Column IDE Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Chronological Instructions & Automated Test Checks (5 cols) */}
-        <div className="lg:col-span-5 space-y-5">
-          {/* Chronological Step-by-Step Instructions Card */}
-          <div className="p-5 sm:p-6 rounded-2xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-[#BDC3C7]/50 dark:border-[#2C3E50] pb-3">
-              <div className="flex items-center gap-2">
-                <ListChecks className="w-4 h-4 text-[#1E3A78] dark:text-[#BDC3C7]" />
-                <h2 className="font-bold text-sm text-[#2C3E50] dark:text-[#F5F5DC]">
-                  Chronological Lab Instructions
-                </h2>
+      {/* Quick Tip + Exam Watch-Out Strip */}
+      {(currentProject.keyTip || currentProject.pitfallWarning) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {currentProject.keyTip && (
+            <div className="p-3.5 rounded-xl bg-[#FAF9F5] dark:bg-[#1A2634] border border-[#BDC3C7]/80 dark:border-[#2C3E50] text-xs space-y-1">
+              <div className="font-mono font-bold text-[11px] text-[#1E3A78] dark:text-sky-300">
+                Quick Tip · Shared Notebook Kernel
               </div>
-              <span className="text-[11px] font-mono text-[#5D6D7E] dark:text-[#BDC3C7]">
-                Follow Steps 1 → {totalSteps}
-              </span>
+              <p className="text-[#2C3E50]/85 dark:text-[#BDC3C7] leading-relaxed">
+                {currentProject.keyTip} Run each cell top to bottom with <code className="font-mono font-semibold">Shift+Enter</code> — variables and functions stay live across cells.
+              </p>
             </div>
+          )}
+          {currentProject.pitfallWarning && (
+            <div className="p-3.5 rounded-xl bg-[#5A1827] text-[#F5F5DC] text-xs space-y-1 shadow-xs">
+              <div className="flex items-center gap-1.5 font-mono font-bold text-[11px] text-amber-300">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>Exam Watch-Out</span>
+              </div>
+              <p className="text-[#F5F5DC]/90 leading-relaxed">
+                {currentProject.pitfallWarning}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
-            <div className="space-y-3">
-              {currentProject.steps.map((step, idx) => {
-                const isSelected = idx === currentStepIndex;
-                const isComplete = completedSteps.includes(step.stepNumber);
-                const runState = stepTestMap[step.stepNumber];
+      {/* Subtle Kernel Status Line */}
+      {kernelBannerMsg && (
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-lg bg-[#FAF9F5] dark:bg-[#141C24] border border-[#BDC3C7]/70 dark:border-[#2C3E50] text-[11px] font-mono text-[#2C3E50]/80 dark:text-[#BDC3C7]">
+          <span>{kernelBannerMsg}</span>
+          <span className="hidden sm:inline text-[#5D6D7E] dark:text-[#BDC3C7]/70">
+            Shortcuts: Shift+Enter (Run &amp; Next) · Ctrl+Enter (Run Cell)
+          </span>
+        </div>
+      )}
 
-                return (
-                  <div
-                    key={step.stepNumber}
-                    onClick={() => setCurrentStepIndex(idx)}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-2.5 ${
-                      isSelected
-                        ? 'border-[#1E3A78] dark:border-amber-400/70 bg-white dark:bg-[#1A2634] shadow-xs'
-                        : isComplete
-                        ? 'border-emerald-500/40 bg-emerald-50/40 dark:bg-emerald-950/15'
-                        : 'border-[#BDC3C7]/70 dark:border-[#2C3E50] bg-white/70 dark:bg-[#1A2634]/60 hover:border-[#1E3A78]/50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        {isComplete ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        ) : (
-                          <span
-                            className={`w-5 h-5 rounded-full text-[11px] font-mono font-bold flex items-center justify-center shrink-0 ${
-                              isSelected
-                                ? 'bg-[#1E3A78] text-[#F5F5DC]'
-                                : 'bg-[#EBE9DF] dark:bg-[#243342] text-[#2C3E50] dark:text-[#BDC3C7]'
-                            }`}
-                          >
-                            {step.stepNumber}
-                          </span>
-                        )}
-                        <h3 className="text-xs sm:text-sm font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
-                          {step.title}
-                        </h3>
-                      </div>
+      {/* Sequential Jupyter Notebook Cells Stack */}
+      <div className="space-y-6">
+        {cells.map((cell, cellIndex) => {
+          const step = getStepForCell(cell);
+          const code = getCellCode(cell.id);
+          const codeLines = code.split('\n');
+          const result = cellResults[cell.id];
+          const isThisRunning = runningCellId === cell.id;
+          const isStepPassed = step
+            ? result?.stepCheck
+              ? result.stepCheck.passed
+              : completedSteps.includes(step.stepNumber)
+            : false;
+          const isStepFailed = Boolean(step && result?.stepCheck && !result.stepCheck.passed);
+          const isPatternOpen = Boolean(openPatterns[cell.id]);
 
-                      <span className="text-[10px] font-mono text-[#5D6D7E] dark:text-[#BDC3C7] shrink-0">
-                        Obj {step.targetObjectiveId}
+          const promptLabel = isThisRunning
+            ? 'In [*]:'
+            : result?.executionCount
+            ? `In [${result.executionCount}]:`
+            : 'In [ ]:';
+
+          return (
+            <section
+              key={cell.id}
+              aria-label={cell.title}
+              className={`rounded-2xl border transition-colors overflow-hidden shadow-xs ${
+                isStepPassed
+                  ? 'border-emerald-500/50 bg-[#FAF9F5] dark:bg-[#1A2634]'
+                  : isStepFailed
+                  ? 'border-rose-500/50 bg-[#FAF9F5] dark:bg-[#1A2634]'
+                  : 'border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#1A2634]'
+              }`}
+            >
+              {/* Cell Markdown / Instruction Header */}
+              <div className="px-4 sm:px-5 py-4 space-y-2.5 border-b border-[#BDC3C7]/60 dark:border-[#2C3E50]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    {cell.kind === 'setup' ? (
+                      <span className="px-2 py-0.5 rounded font-mono text-[11px] font-bold bg-[#1E3A78] text-[#F5F5DC]">
+                        SETUP
                       </span>
-                    </div>
-
-                    <p className="text-xs text-[#2C3E50]/90 dark:text-[#BDC3C7] leading-relaxed pl-7">
-                      {step.taskInstruction}
-                    </p>
-
-                    {isSelected && step.patternCode && (
-                      <div className="ml-7 p-3 rounded-lg bg-[#FAF9F5] dark:bg-[#141C24] border border-[#BDC3C7]/70 dark:border-[#2C3E50] space-y-1.5">
-                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#1E3A78] dark:text-amber-300">
-                          <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                          <span>{step.patternTitle || 'Worked Pattern Example'}</span>
-                        </div>
-                        <pre className="p-2.5 rounded-md bg-[#1E2936] text-emerald-300 font-mono text-[11px] overflow-x-auto leading-relaxed">
-                          <code>{step.patternCode}</code>
-                        </pre>
-                        {step.patternExplanation && (
-                          <p className="text-[11px] text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed">
-                            {step.patternExplanation}
-                          </p>
-                        )}
-                      </div>
+                    ) : isStepPassed ? (
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    ) : (
+                      <span className="w-6 h-6 rounded-full bg-[#1E3A78] text-[#F5F5DC] font-mono text-xs font-bold flex items-center justify-center shrink-0">
+                        {cell.stepNumber || cellIndex + 1}
+                      </span>
                     )}
 
+                    <h2 className="text-sm sm:text-base font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
+                      {step ? step.title : cell.title}
+                    </h2>
+
+                    {step && (
+                      <span className="font-mono text-[11px] text-[#5D6D7E] dark:text-[#BDC3C7]">
+                        · Obj {step.targetObjectiveId}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Dual-Coded Step Status Label */}
+                  {step && (
+                    <div className="flex items-center gap-2 shrink-0">
+                      {isStepPassed ? (
+                        <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>PASSED</span>
+                        </span>
+                      ) : isStepFailed ? (
+                        <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold text-rose-700 dark:text-rose-400">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span>TRY AGAIN</span>
+                        </span>
+                      ) : (
+                        <span className="font-mono text-xs font-semibold text-[#5D6D7E] dark:text-[#BDC3C7]">
+                          NOT RUN
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Clear Step / Setup Instructions */}
+                <p className="text-xs sm:text-sm text-[#2C3E50]/90 dark:text-[#BDC3C7] leading-relaxed">
+                  {step ? step.taskInstruction : cell.description}
+                </p>
+
+                {/* Target Check & Worked Pattern Toggle Row */}
+                {step && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
                     {step.expectedExample && (
-                      <div className="pl-7 text-[11px] font-mono text-[#1E3A78] dark:text-sky-300">
+                      <div className="text-[11px] font-mono text-[#1E3A78] dark:text-sky-300">
                         Target check: <code>{step.expectedExample}</code>
                       </div>
                     )}
 
-                    {runState && !runState.passed && runState.failureMessage && (
-                      <div className="ml-7 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-500/40 text-[11px] font-mono text-rose-700 dark:text-rose-300">
-                        {runState.failureMessage}
-                      </div>
-                    )}
-
-                    {isSelected && (
-                      <div className="pl-7 pt-1 flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={checkingStepNum === step.stepNumber}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRunSingleStep(step);
-                            }}
-                            className="px-3 py-1.5 rounded-md text-[11px] font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                          >
-                            <FlaskConical className="w-3 h-3" />
-                            <span>
-                              {checkingStepNum === step.stepNumber
-                                ? `Checking Step ${step.stepNumber}...`
-                                : `Check Step ${step.stepNumber}`}
-                            </span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCurrentStepIndex(idx);
-                              setIsBreadcrumbsOpen(true);
-                            }}
-                            className="text-[11px] font-semibold text-[#5A1827] dark:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer"
-                          >
-                            <Lightbulb className="w-3.5 h-3.5" />
-                            <span>Hint</span>
-                          </button>
-                        </div>
-
-                        {idx < currentProject.steps.length - 1 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCurrentStepIndex(idx + 1);
-                            }}
-                            className="text-[11px] font-semibold text-[#1E3A78] dark:text-[#BDC3C7] hover:underline flex items-center gap-1 cursor-pointer"
-                          >
-                            <span>Next: Step {idx + 2}</span>
-                            <ArrowRight className="w-3 h-3" />
-                          </button>
+                    {step.patternCode && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenPatterns((prev) => ({
+                            ...prev,
+                            [cell.id]: !prev[cell.id],
+                          }))
+                        }
+                        className="text-xs font-semibold text-[#1E3A78] dark:text-amber-300 hover:underline inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>{isPatternOpen ? 'Hide Worked Pattern' : 'Show Worked Pattern'}</span>
+                        {isPatternOpen ? (
+                          <ChevronUp className="w-3.5 h-3.5" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5" />
                         )}
-                      </div>
+                      </button>
                     )}
                   </div>
-                );
-              })}
-            </div>
+                )}
 
-            {/* Quick Concept Tip */}
-            {currentProject.keyTip && (
-              <div className="p-3.5 rounded-xl bg-white dark:bg-[#1A2634] border border-[#BDC3C7]/80 dark:border-[#2C3E50] space-y-1 text-xs">
-                <div className="font-bold text-[#1E3A78] dark:text-sky-300 text-[11px] font-mono">
-                  Quick Tip
-                </div>
-                <p className="text-[#2C3E50]/85 dark:text-[#BDC3C7] leading-relaxed">
-                  {currentProject.keyTip}
-                </p>
-              </div>
-            )}
-
-            {/* Common PCEP Exam Pitfall */}
-            {currentProject.pitfallWarning && (
-              <div className="p-3.5 rounded-xl bg-[#5A1827] text-[#F5F5DC] space-y-1.5 text-xs shadow-xs">
-                <div className="flex items-center gap-2 font-bold font-mono text-[11px] text-amber-300">
-                  <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
-                  <span>Exam Watch-Out</span>
-                </div>
-                <p className="text-[11px] text-[#F5F5DC]/90 leading-relaxed">
-                  {currentProject.pitfallWarning}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Automated Test Matrix Card */}
-          <div className="p-5 rounded-2xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] shadow-xs space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <FlaskConical className="w-4 h-4 text-[#1E3A78] dark:text-[#BDC3C7]" />
-                <h3 className="font-bold text-sm text-[#2C3E50] dark:text-[#F5F5DC]">
-                  Automated Step Checks
-                </h3>
-              </div>
-
-              <span className="text-[11px] font-mono font-semibold text-[#2C3E50] dark:text-[#BDC3C7] tabular-nums">
-                {testsPassedCount} of {testCards.length} Passed
-              </span>
-            </div>
-
-            <div className="space-y-2.5">
-              {testCards.map((t) => (
-                <div
-                  key={t.stepNumber}
-                  className={`p-3 rounded-xl border transition-all text-xs space-y-1 ${
-                    t.passed === true
-                      ? 'border-emerald-500/40 bg-white dark:bg-[#1A2634]'
-                      : t.passed === false
-                      ? 'border-rose-500/40 bg-rose-50/50 dark:bg-rose-950/20'
-                      : 'border-[#BDC3C7]/70 dark:border-[#2C3E50] bg-white dark:bg-[#1A2634]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {t.passed === true ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      ) : t.passed === false ? (
-                        <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                      ) : (
-                        <span className="w-4 h-4 rounded-full border border-[#BDC3C7] dark:border-[#5D6D7E] text-[10px] font-mono flex items-center justify-center shrink-0">
-                          {t.stepNumber}
-                        </span>
-                      )}
-                      <span className="font-mono font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
-                        {t.name}
-                      </span>
+                {/* Collapsible Analogous Worked Pattern Example */}
+                {step && step.patternCode && isPatternOpen && (
+                  <div className="mt-2 p-3.5 rounded-xl bg-white dark:bg-[#141C24] border border-[#BDC3C7]/80 dark:border-[#2C3E50] space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#1E3A78] dark:text-amber-300">
+                      <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                      <span>{step.patternTitle || 'Worked Pattern Example'}</span>
                     </div>
-                    <span
-                      className={`font-mono text-[10px] font-semibold ${
-                        t.passed === true
-                          ? 'text-emerald-700 dark:text-emerald-400'
-                          : t.passed === false
-                          ? 'text-rose-700 dark:text-rose-400'
-                          : 'text-[#5D6D7E] dark:text-[#BDC3C7]'
-                      }`}
-                    >
-                      {t.passed === true ? 'PASSED' : t.passed === false ? 'TRY AGAIN' : 'NOT RUN'}
-                    </span>
+                    <pre className="p-3 rounded-lg bg-[#1E2936] text-emerald-300 font-mono text-xs overflow-x-auto leading-relaxed">
+                      <code>{step.patternCode}</code>
+                    </pre>
+                    {step.patternExplanation && (
+                      <p className="text-xs text-[#2C3E50]/85 dark:text-[#BDC3C7] leading-relaxed">
+                        {step.patternExplanation}
+                      </p>
+                    )}
                   </div>
-
-                  <div className="text-[11px] font-mono text-[#2C3E50]/75 dark:text-[#BDC3C7] pl-6 overflow-x-auto">
-                    <code>{t.assertionText}</code>
-                  </div>
-
-                  {t.passed === false && t.failureMessage && (
-                    <div className="pt-1 pl-6 text-[11px] font-mono text-rose-700 dark:text-rose-400">
-                      {t.failureMessage}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Full-Height Natural Code Editor & Output Panel (7 cols) */}
-        <div className="lg:col-span-7 space-y-4">
-          {/* Editor Container */}
-          <div className="rounded-2xl border border-[#2C3E50] bg-[#1E2936] shadow-sm overflow-hidden flex flex-col">
-            {/* Multi-Tab Bar */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[#2C3E50] bg-[#141C24] text-xs gap-2 overflow-x-auto">
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  onClick={() => setActiveTab('source')}
-                  className={`px-3 py-1.5 rounded-md font-mono text-xs flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ${
-                    activeTab === 'source'
-                      ? 'bg-[#1E2936] text-[#F5F5DC] font-semibold border border-[#2C3E50]'
-                      : 'text-[#BDC3C7] hover:text-[#F5F5DC]'
-                  }`}
-                >
-                  <FileCode className="w-3.5 h-3.5 text-sky-400" />
-                  <span>{fileName}</span>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('tests')}
-                  className={`px-3 py-1.5 rounded-md font-mono text-xs flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ${
-                    activeTab === 'tests'
-                      ? 'bg-[#1E2936] text-[#F5F5DC] font-semibold border border-[#2C3E50]'
-                      : 'text-[#BDC3C7] hover:text-[#F5F5DC]'
-                  }`}
-                >
-                  <FlaskConical className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>{testFileName}</span>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('hints')}
-                  className={`px-3 py-1.5 rounded-md font-mono text-xs flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap ${
-                    activeTab === 'hints'
-                      ? 'bg-[#1E2936] text-[#F5F5DC] font-semibold border border-[#2C3E50]'
-                      : 'text-[#BDC3C7] hover:text-[#F5F5DC]'
-                  }`}
-                >
-                  <FileText className="w-3.5 h-3.5 text-amber-400" />
-                  <span>step_guide.md</span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={handleLoadSolution}
-                  className="px-2.5 py-1 text-[11px] font-mono text-[#BDC3C7] hover:text-[#F5F5DC] rounded border border-[#2C3E50] hover:bg-[#1E2936] transition-colors cursor-pointer whitespace-nowrap"
-                  title="Fill editor with working example solution"
-                >
-                  Show Example Solution
-                </button>
-                <button
-                  onClick={handleCopyCode}
-                  className="p-1.5 text-[#BDC3C7] hover:text-[#F5F5DC] rounded cursor-pointer"
-                  title="Copy Code"
-                >
-                  {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Code Content Area - Full 540px Explicit Scrollable IDE Viewport */}
-            {activeTab === 'source' ? (
-              <div className="flex h-[540px] bg-[#1E2936]">
-                {/* Scroll-Synced Line Numbers Gutter */}
-                <div
-                  ref={gutterRef}
-                  onClick={() => textareaRef.current?.focus()}
-                  className="w-12 h-[540px] overflow-hidden py-4 pb-16 pl-2 pr-3 select-none text-right font-mono text-[13px] leading-6 text-[#BDC3C7]/45 border-r border-[#2C3E50] bg-[#18222D] shrink-0 tabular-nums cursor-text"
-                >
-                  {Array.from({ length: gutterLineCount }, (_, i) => (
-                    <div key={i} className="h-6 leading-6">
-                      {i + 1 < 10 ? `0${i + 1}` : i + 1}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Native Scrollable Code Textarea */}
-                <textarea
-                  ref={textareaRef}
-                  value={currentCode}
-                  onChange={(e) => setCurrentCode(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  onScroll={(e) => {
-                    if (gutterRef.current) {
-                      gutterRef.current.scrollTop = e.currentTarget.scrollTop;
-                    }
-                  }}
-                  wrap="off"
-                  spellCheck={false}
-                  autoCapitalize="off"
-                  autoComplete="off"
-                  aria-label="Python code editor"
-                  className="flex-1 block w-full h-[540px] py-4 px-4 font-mono text-[13px] leading-6 text-[#F5F5DC] bg-[#1E2936] resize-none overflow-y-auto overflow-x-auto focus:outline-hidden whitespace-pre selection:bg-[#1E3A78]/70 selection:text-[#F5F5DC]"
-                />
-              </div>
-            ) : activeTab === 'tests' ? (
-              <div className="p-5 font-mono text-[13px] text-[#F5F5DC] bg-[#1E2936] h-[520px] overflow-y-auto leading-6">
-                <pre className="whitespace-pre-wrap">{`# Automated checks run when you click "Run Tests"\n\n` +
-                  currentProject.steps
-                    .map(
-                      (s) =>
-                        `def test_step_${s.stepNumber}():\n    # ${s.title}\n    ${s.validationSnippet}`
-                    )
-                    .join('\n\n')}</pre>
-              </div>
-            ) : (
-              <div className="p-5 font-mono text-xs text-[#F5F5DC] bg-[#1E2936] h-[520px] overflow-y-auto leading-relaxed space-y-4">
-                <h4 className="font-bold text-sm text-amber-400">
-                  # {currentProject.title} — Step-by-Step Guide
-                </h4>
-                {currentProject.steps.map((step) => (
-                  <div key={step.stepNumber} className="p-3.5 rounded-lg bg-[#141C24] border border-[#2C3E50] space-y-1.5">
-                    <div className="font-bold text-sky-300">
-                      Step {step.stepNumber}: {step.title}
-                    </div>
-                    <p className="text-[#BDC3C7]">{step.taskInstruction}</p>
-                    <pre className="pt-1 text-emerald-300 overflow-x-auto">{step.breadcrumbs.level2Syntax}</pre>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Editor Bottom Status Bar */}
-            <div className="flex items-center justify-between px-4 py-2 border-t border-[#2C3E50] bg-[#141C24] text-[11px] font-mono text-[#BDC3C7] tabular-nums">
-              <div className="flex items-center gap-3">
-                <span className="text-[#F5F5DC] font-semibold">Python 3.11</span>
-                <span aria-hidden="true">·</span>
-                <span>{codeLines.length} lines</span>
-                <span aria-hidden="true">·</span>
-                <span>Tab = 4 spaces</span>
-              </div>
-              <div className="text-emerald-400">
-                Autosaved
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Output / Terminal Tabs */}
-          <div className="rounded-2xl border border-[#2C3E50] bg-[#141C24] shadow-sm overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[#2C3E50] bg-[#0E141B] text-xs">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setOutputTab('repl')}
-                  className={`px-2.5 py-1 rounded font-mono text-[11px] cursor-pointer ${
-                    outputTab === 'repl'
-                      ? 'bg-[#1E2936] text-[#F5F5DC] font-semibold'
-                      : 'text-[#BDC3C7] hover:text-[#F5F5DC]'
-                  }`}
-                >
-                  Program Output
-                </button>
-
-                <button
-                  onClick={() => setOutputTab('test')}
-                  className={`px-2.5 py-1 rounded font-mono text-[11px] flex items-center gap-1.5 cursor-pointer ${
-                    outputTab === 'test'
-                      ? 'bg-[#1E2936] text-[#F5F5DC] font-semibold'
-                      : 'text-[#BDC3C7] hover:text-[#F5F5DC]'
-                  }`}
-                >
-                  <span>Test Results</span>
-                  <span className="text-[10px] text-[#BDC3C7]">
-                    ({testsPassedCount}/{testCards.length})
-                  </span>
-                </button>
-
-                {executionMeta && (
-                  <span className="hidden sm:inline font-mono text-[10px] text-[#BDC3C7]/70 pl-2">
-                    {executionMeta.durationMs}ms
-                  </span>
                 )}
               </div>
 
-              <button
-                onClick={() => setTerminalOutput('>>> Terminal cleared.\n')}
-                className="p-1 text-[#BDC3C7] hover:text-[#F5F5DC] rounded cursor-pointer"
-                title="Clear Terminal"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
+              {/* Jupyter Code Cell Frame */}
+              <div className="bg-[#1E2936] text-[#F5F5DC]">
+                {/* Cell Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-[#141C24] border-b border-[#2C3E50] text-[11px] font-mono">
+                  <div className="flex items-center gap-2 text-[#BDC3C7]">
+                    <span className="font-semibold text-[#F5F5DC]">{cell.title}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="tabular-nums">{codeLines.length} lines</span>
+                  </div>
 
-            {/* Terminal Body */}
-            <div
-              ref={terminalContainerRef}
-              className="p-4 font-mono text-xs text-[#F5F5DC] min-h-[200px] max-h-[320px] overflow-y-auto leading-relaxed scrollbar-thin"
-            >
-              <pre className="whitespace-pre-wrap font-mono">
-                <code>{terminalOutput}</code>
-              </pre>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {step && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const idx = currentProject.steps.findIndex(
+                            (s) => s.stepNumber === step.stepNumber
+                          );
+                          if (idx >= 0) setCurrentStepIndex(idx);
+                          setIsBreadcrumbsOpen(true);
+                        }}
+                        className="px-2.5 py-1 rounded text-[#F5F5DC] bg-[#1E2936] hover:bg-[#2C3E50] border border-[#2C3E50] transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                      >
+                        <Lightbulb className="w-3 h-3 text-amber-400" />
+                        <span>Need Hint</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleLoadCellSolution(cell)}
+                      className="px-2.5 py-1 rounded text-[#BDC3C7] hover:text-[#F5F5DC] border border-[#2C3E50] hover:bg-[#1E2936] transition-colors cursor-pointer whitespace-nowrap"
+                      title="Fill this cell with the reference solution"
+                    >
+                      Show Solution
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => resetCellCode(cell.id)}
+                      className="px-2.5 py-1 rounded text-[#BDC3C7] hover:text-[#F5F5DC] border border-[#2C3E50] hover:bg-[#1E2936] transition-colors cursor-pointer whitespace-nowrap"
+                      title="Reset this cell to starter code"
+                    >
+                      Reset Cell
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleCopyCell(cell.id)}
+                      className="p-1 text-[#BDC3C7] hover:text-[#F5F5DC] rounded cursor-pointer"
+                      title="Copy cell code"
+                    >
+                      {copiedCellId === cell.id ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Jupyter Prompt Margin + Line Numbers + Auto-Expanded Textarea */}
+                <div className="flex items-stretch">
+                  {/* Left Jupyter In [n]: Gutter */}
+                  <div
+                    onClick={() => cellTextareaRefs.current[cell.id]?.focus()}
+                    className="w-16 sm:w-20 py-3.5 px-2 select-none text-right font-mono text-xs leading-6 border-r border-[#2C3E50] bg-[#141C24]/70 shrink-0 tabular-nums cursor-text"
+                  >
+                    <span
+                      className={
+                        isThisRunning
+                          ? 'text-amber-300 font-bold'
+                          : result?.executionCount
+                          ? 'text-sky-300 font-bold'
+                          : 'text-[#BDC3C7]/60'
+                      }
+                    >
+                      {promptLabel}
+                    </span>
+                  </div>
+
+                  {/* Line Numbers */}
+                  <div
+                    onClick={() => cellTextareaRefs.current[cell.id]?.focus()}
+                    className="w-10 py-3.5 pr-2.5 pl-1 select-none text-right font-mono text-[13px] leading-6 text-[#BDC3C7]/40 border-r border-[#2C3E50]/70 bg-[#18222D] shrink-0 tabular-nums cursor-text"
+                  >
+                    {codeLines.map((_, lineIdx) => (
+                      <div key={lineIdx} className="h-6 leading-6">
+                        {lineIdx + 1 < 10 ? `0${lineIdx + 1}` : lineIdx + 1}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Multi-line Editable Python Cell */}
+                  <textarea
+                    ref={(el) => {
+                      cellTextareaRefs.current[cell.id] = el;
+                    }}
+                    value={code}
+                    onChange={(e) => setCellCode(cell.id, e.target.value)}
+                    onKeyDown={(e) => handleCellKeyDown(e, cell)}
+                    rows={Math.max(6, codeLines.length + 1)}
+                    wrap="off"
+                    spellCheck={false}
+                    autoCapitalize="off"
+                    autoComplete="off"
+                    aria-label={`${cell.title} Python editor`}
+                    className="flex-1 block w-full min-h-[148px] py-3.5 px-4 font-mono text-[13px] leading-6 text-[#F5F5DC] bg-[#1E2936] resize-y overflow-x-auto focus:outline-hidden whitespace-pre selection:bg-[#1E3A78]/70 selection:text-[#F5F5DC]"
+                  />
+                </div>
+
+                {/* Cell Action Footer */}
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-[#141C24] border-t border-[#2C3E50] text-xs">
+                  <div className="font-mono text-[11px] text-[#BDC3C7]/80">
+                    Press <kbd className="px-1.5 py-0.5 rounded bg-[#1E2936] border border-[#2C3E50] text-[#F5F5DC]">Shift+Enter</kbd> to run &amp; advance · <kbd className="px-1.5 py-0.5 rounded bg-[#1E2936] border border-[#2C3E50] text-[#F5F5DC]">Tab</kbd> = 4 spaces
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isRunningAll || isThisRunning}
+                    onClick={() => handleRunCell(cell, false)}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0 ${
+                      cell.kind === 'setup'
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        : 'bg-[#1E3A78] hover:bg-[#274B9A] text-[#F5F5DC]'
+                    }`}
+                  >
+                    {cell.kind === 'setup' ? (
+                      <Play className="w-3.5 h-3.5" />
+                    ) : (
+                      <FlaskConical className={`w-3.5 h-3.5 ${isThisRunning ? 'animate-spin' : ''}`} />
+                    )}
+                    <span>
+                      {isThisRunning
+                        ? 'Running Cell...'
+                        : cell.kind === 'setup'
+                        ? 'Run Setup Cell'
+                        : `Run & Check Step ${cell.stepNumber}`}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Inline Output, Step Check Badge & Shared Kernel Variable Preview Tray */}
+              {result && (
+                <div className="bg-[#0E141B] text-[#F5F5DC] border-t border-[#2C3E50] divide-y divide-[#2C3E50]">
+                  {/* 1. Step Check Result Banner */}
+                  {result.stepCheck && (
+                    <div
+                      className={`px-4 sm:px-5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs font-mono ${
+                        result.stepCheck.passed
+                          ? 'bg-emerald-950/50 text-emerald-300'
+                          : 'bg-rose-950/50 text-rose-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {result.stepCheck.passed ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                        )}
+                        <span className="font-bold">
+                          {result.stepCheck.passed
+                            ? `PASSED · Step ${cell.stepNumber}`
+                            : `TRY AGAIN · Step ${cell.stepNumber}`}
+                        </span>
+                        {result.stepCheck.message && (
+                          <span className="text-[#F5F5DC]/90">
+                            — {result.stepCheck.message}
+                          </span>
+                        )}
+                      </div>
+
+                      <span className="text-[11px] text-[#BDC3C7] tabular-nums">
+                        {result.durationMs}ms · {result.engine === 'pyodide-wasm' ? 'Pyodide 3.11' : 'Simulator'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 2. Live Out [n]: Console Output / Error Traceback */}
+                  <div className="flex items-start">
+                    <div className="w-16 sm:w-20 py-3 px-2 text-right font-mono text-xs text-rose-300/80 border-r border-[#2C3E50] bg-[#141C24]/50 shrink-0 tabular-nums select-none">
+                      {result.executionCount ? `Out [${result.executionCount}]:` : 'Out:'}
+                    </div>
+                    <div className="flex-1 p-3.5 font-mono text-xs overflow-x-auto space-y-2">
+                      {!result.stepCheck && (
+                        <div className="flex items-center justify-between text-[11px] text-[#BDC3C7]/70 pb-1">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Terminal className="w-3 h-3" />
+                            <span>Cell Output</span>
+                          </span>
+                          <span className="tabular-nums">{result.durationMs}ms</span>
+                        </div>
+                      )}
+
+                      {result.stdout && (
+                        <pre className="whitespace-pre-wrap text-[#F5F5DC] leading-relaxed">
+                          <code>{result.stdout}</code>
+                        </pre>
+                      )}
+
+                      {result.stderr && (
+                        <pre className="whitespace-pre-wrap text-rose-300 bg-rose-950/40 p-2.5 rounded-lg border border-rose-500/30 leading-relaxed">
+                          <code>{result.stderr}</code>
+                        </pre>
+                      )}
+
+                      {!result.stdout && !result.stderr && (
+                        <div className="text-[#BDC3C7]/70 italic">
+                          (Cell executed with no printed output.)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3. Live Shared Kernel Variable Preview */}
+                  {result.variables.length > 0 && (
+                    <div className="px-4 sm:px-5 py-3 bg-[#141C24]/80 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-mono text-[#BDC3C7]">
+                        <span className="inline-flex items-center gap-1.5 font-bold text-sky-300">
+                          <Database className="w-3.5 h-3.5" />
+                          <span>Shared Kernel Variables ({result.variables.length})</span>
+                        </span>
+                        <span className="text-[#BDC3C7]/70">
+                          Available to all cells below
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-lg border border-[#2C3E50] bg-[#0E141B]">
+                        <table className="w-full text-left font-mono text-[11px] tabular-nums">
+                          <thead className="bg-[#18222D] text-[#BDC3C7] border-b border-[#2C3E50]">
+                            <tr>
+                              <th className="py-1.5 px-3 font-semibold">Variable</th>
+                              <th className="py-1.5 px-3 font-semibold">Type</th>
+                              <th className="py-1.5 px-3 font-semibold">Live Value Preview</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#2C3E50]/60">
+                            {result.variables.map((v) => (
+                              <tr key={v.name} className="hover:bg-[#18222D]/60">
+                                <td className="py-1.5 px-3 font-bold text-amber-300 whitespace-nowrap">
+                                  {v.name}
+                                </td>
+                                <td className="py-1.5 px-3 text-sky-300 whitespace-nowrap">
+                                  {v.typeName}
+                                </td>
+                                <td className="py-1.5 px-3 text-[#F5F5DC]/90 break-all">
+                                  {v.reprValue}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+
+      {/* Lab Completion Next-Step Footer */}
+      {completedCount >= totalSteps && totalSteps > 0 && (
+        <div className="p-5 rounded-2xl border border-emerald-500/50 bg-emerald-50/70 dark:bg-emerald-950/25 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 text-sm font-bold text-emerald-800 dark:text-emerald-300">
+              <CheckCircle2 className="w-5 h-5" />
+              <span>Lab Complete ({completedCount}/{totalSteps} Steps Passed)</span>
             </div>
+            <p className="text-xs text-[#2C3E50]/85 dark:text-[#BDC3C7]">
+              Every cell in {currentProject.title} passed! Move on to the next domain lab or review your capstone project in Portfolio.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setActiveView('portfolio')}
+              className="px-4 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#5A1827] hover:bg-[#48121E] transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+            >
+              <GitCommit className="w-3.5 h-3.5" />
+              <span>Open Portfolio</span>
+            </button>
+
+            {nextLab && (
+              <button
+                type="button"
+                onClick={() => selectProject(nextLab.id)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <span>Next: {nextLab.title.split(':')[0].split('(')[0].trim()}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* Breadcrumbs Hint Drawer */}
       <BreadcrumbsDrawer

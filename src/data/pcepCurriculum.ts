@@ -162,11 +162,77 @@ if __name__ == "__main__":
     banner = format_trip_banner(temp_f, stops, extra)
     print("Road Trip Summary:", banner, sep=" -> ", end="\\n[Done]\\n")
 `,
+    notebookCells: [
+      {
+        id: 'step-1',
+        kind: 'step',
+        stepNumber: 1,
+        title: 'Cell 1 · Celsius to Fahrenheit',
+        starterCode: `# Cell 1 (Step 1): Convert Celsius to Fahrenheit
+# Formula: (float(celsius) * 9 / 5) + 32
+def celsius_to_fahrenheit(celsius):
+    # TODO: Replace 0.0 with (float(celsius) * 9 / 5) + 32
+    fahrenheit = 0.0
+    return fahrenheit
+
+temp_f = celsius_to_fahrenheit(25)
+print("25 C in Fahrenheit:", temp_f)`,
+        solutionCode: `# Cell 1 (Step 1): Convert Celsius to Fahrenheit
+def celsius_to_fahrenheit(celsius):
+    fahrenheit = (float(celsius) * 9 / 5) + 32
+    return fahrenheit
+
+temp_f = celsius_to_fahrenheit(25)
+print("25 C in Fahrenheit:", temp_f)`,
+      },
+      {
+        id: 'step-2',
+        kind: 'step',
+        stepNumber: 2,
+        title: 'Cell 2 · Fuel Stops & Leftover Miles',
+        starterCode: `# Cell 2 (Step 2): Use // for whole stops and % for leftover miles
+def trip_fuel_stops(total_miles, miles_per_tank):
+    # TODO: Replace both 0s with int(total_miles) // int(miles_per_tank) and %
+    full_stops = 0
+    leftover_miles = 0
+    return (full_stops, leftover_miles)
+
+stops, extra = trip_fuel_stops(650, 300)
+print("Full stops:", stops, "| Extra miles:", extra)`,
+        solutionCode: `# Cell 2 (Step 2): Use // for whole stops and % for leftover miles
+def trip_fuel_stops(total_miles, miles_per_tank):
+    full_stops = int(total_miles) // int(miles_per_tank)
+    leftover_miles = int(total_miles) % int(miles_per_tank)
+    return (full_stops, leftover_miles)
+
+stops, extra = trip_fuel_stops(650, 300)
+print("Full stops:", stops, "| Extra miles:", extra)`,
+      },
+      {
+        id: 'step-3',
+        kind: 'step',
+        stepNumber: 3,
+        title: 'Cell 3 · Format Shared Trip Summary',
+        starterCode: `# Cell 3 (Step 3): Uses temp_f, stops, and extra from Cells 1 & 2!
+def format_trip_banner(temp_f, stops, extra):
+    # TODO: Return f"{temp_f} F | {stops} stops | {extra} mi left"
+    return ""
+
+banner = format_trip_banner(temp_f, stops, extra)
+print("Road Trip Summary:", banner, sep=" -> ", end="\\n[Done]\\n")`,
+        solutionCode: `# Cell 3 (Step 3): Uses temp_f, stops, and extra from Cells 1 & 2!
+def format_trip_banner(temp_f, stops, extra):
+    return f"{temp_f} F | {stops} stops | {extra} mi left"
+
+banner = format_trip_banner(temp_f, stops, extra)
+print("Road Trip Summary:", banner, sep=" -> ", end="\\n[Done]\\n")`,
+      },
+    ],
     steps: [
       {
         stepNumber: 1,
         title: 'Step 1: Convert & Calculate with float()',
-        taskInstruction: 'Go to celsius_to_fahrenheit(celsius) (lines 6-9). Replace 0.0 with (float(celsius) * 9 / 5) + 32 so inputs like 25 or "25" convert to 77.0.',
+        taskInstruction: 'Inside celsius_to_fahrenheit(celsius), replace 0.0 with (float(celsius) * 9 / 5) + 32 so inputs like 25 or "25" convert to 77.0.',
         targetObjectiveId: '1.5',
         patternTitle: 'Worked Pattern (Converting Dollars to Cents)',
         patternCode: `def to_cents(dollars):
@@ -185,7 +251,7 @@ if __name__ == "__main__":
       {
         stepNumber: 2,
         title: 'Step 2: Split Whole Groups (//) & Leftovers (%)',
-        taskInstruction: 'Go to trip_fuel_stops(total_miles, miles_per_tank) (lines 14-18). Set full_stops = int(total_miles) // int(miles_per_tank) and leftover_miles = int(total_miles) % int(miles_per_tank).',
+        taskInstruction: 'Inside trip_fuel_stops(total_miles, miles_per_tank), set full_stops = int(total_miles) // int(miles_per_tank) and leftover_miles = int(total_miles) % int(miles_per_tank).',
         targetObjectiveId: '1.4',
         patternTitle: 'Worked Pattern (Pizza Slices per Box)',
         patternCode: `def split_pizzas(slices, per_box):
@@ -205,7 +271,7 @@ if __name__ == "__main__":
       {
         stepNumber: 3,
         title: 'Step 3: Format the Summary String',
-        taskInstruction: 'Go to format_trip_banner(temp_f, stops, extra) (lines 23-25). Replace return "" with return f"{temp_f} F | {stops} stops | {extra} mi left".',
+        taskInstruction: 'Inside format_trip_banner(temp_f, stops, extra), replace return "" with return f"{temp_f} F | {stops} stops | {extra} mi left". Notice it automatically uses temp_f, stops, and extra from Cells 1 & 2!',
         targetObjectiveId: '1.6',
         patternTitle: 'Worked Pattern (Building a Summary Banner)',
         patternCode: `def score_banner(points, level):
@@ -303,11 +369,87 @@ if __name__ == "__main__":
     print("Countdown:", launch_countdown(5))
     print("Valid scores:", filter_scores([85, -5, 92, -1, 100]))
 `,
+    notebookCells: [
+      {
+        id: 'step-1',
+        kind: 'step',
+        stepNumber: 1,
+        title: 'Cell 1 · Award Medals with if / elif / else',
+        starterCode: `# Cell 1 (Step 1): Return "Gold" (90+), "Silver" (70-89), or "Bronze" (< 70)
+def get_medal(score):
+    # TODO: Write an if / elif / else decision
+    return ""
+
+sample_medal = get_medal(95)
+print("Medal for 95:", sample_medal)`,
+        solutionCode: `# Cell 1 (Step 1): Return "Gold" (90+), "Silver" (70-89), or "Bronze" (< 70)
+def get_medal(score):
+    if score >= 90:
+        return "Gold"
+    elif score >= 70:
+        return "Silver"
+    else:
+        return "Bronze"
+
+sample_medal = get_medal(95)
+print("Medal for 95:", sample_medal)`,
+      },
+      {
+        id: 'step-2',
+        kind: 'step',
+        stepNumber: 2,
+        title: 'Cell 2 · Build a Countdown with range()',
+        starterCode: `# Cell 2 (Step 2): Count down from start_num to 1
+def launch_countdown(start_num):
+    # TODO: Return list(range(start_num, 0, -1))
+    return []
+
+countdown = launch_countdown(5)
+print("Countdown:", countdown)`,
+        solutionCode: `# Cell 2 (Step 2): Count down from start_num to 1
+def launch_countdown(start_num):
+    return list(range(start_num, 0, -1))
+
+countdown = launch_countdown(5)
+print("Countdown:", countdown)`,
+      },
+      {
+        id: 'step-3',
+        kind: 'step',
+        stepNumber: 3,
+        title: 'Cell 3 · Filter Scores with break & continue',
+        starterCode: `# Cell 3 (Step 3): Stop on -1 (break), skip < 0 (continue), keep valid scores
+def filter_scores(scores):
+    valid_scores = []
+    for score in scores:
+        # TODO: Add if score == -1: break, if score < 0: continue, valid_scores.append(score)
+        pass
+    return valid_scores
+
+clean_scores = filter_scores([85, -5, 92, -1, 100])
+print("Valid scores:", clean_scores)
+print("Top medal (using Cell 1):", get_medal(max(clean_scores)) if clean_scores else "None")`,
+        solutionCode: `# Cell 3 (Step 3): Stop on -1 (break), skip < 0 (continue), keep valid scores
+def filter_scores(scores):
+    valid_scores = []
+    for score in scores:
+        if score == -1:
+            break
+        if score < 0:
+            continue
+        valid_scores.append(score)
+    return valid_scores
+
+clean_scores = filter_scores([85, -5, 92, -1, 100])
+print("Valid scores:", clean_scores)
+print("Top medal (using Cell 1):", get_medal(max(clean_scores)) if clean_scores else "None")`,
+      },
+    ],
     steps: [
       {
         stepNumber: 1,
         title: 'Step 1: Classify Scores with if / elif / else',
-        taskInstruction: 'Go to get_medal(score) (lines 5-7). Return "Gold" if score >= 90, "Silver" if score >= 70, and "Bronze" otherwise.',
+        taskInstruction: 'In Cell 1 inside get_medal(score), return "Gold" if score >= 90, "Silver" if score >= 70, and "Bronze" otherwise.',
         targetObjectiveId: '2.1',
         patternTitle: 'Worked Pattern (Movie Ticket Pricing)',
         patternCode: `def ticket_type(age):
@@ -330,7 +472,7 @@ if __name__ == "__main__":
       {
         stepNumber: 2,
         title: 'Step 2: Build a Countdown with range()',
-        taskInstruction: 'Go to launch_countdown(start_num) (lines 12-14). Replace return [] with return list(range(start_num, 0, -1)).',
+        taskInstruction: 'In Cell 2 inside launch_countdown(start_num), replace return [] with return list(range(start_num, 0, -1)).',
         targetObjectiveId: '2.6',
         patternTitle: 'Worked Pattern (Counting Down from 3)',
         patternCode: `nums = list(range(3, 0, -1))
@@ -348,7 +490,7 @@ if __name__ == "__main__":
       {
         stepNumber: 3,
         title: 'Step 3: Filter Scores with break & continue',
-        taskInstruction: 'Inside filter_scores(scores) (lines 21-26), replace pass with: if score == -1: break, then if score < 0: continue, then valid_scores.append(score).',
+        taskInstruction: 'In Cell 3 inside filter_scores(scores), replace pass with: if score == -1: break, then if score < 0: continue, then valid_scores.append(score).',
         targetObjectiveId: '2.7',
         patternTitle: 'Worked Pattern (Cleaning a Playlist)',
         patternCode: `for item in ["SongA", "", "SongB", "STOP", "SongC"]:
@@ -456,11 +598,105 @@ if __name__ == "__main__":
     print("Categories:", get_unique_categories(catalog))
     print(format_price_label("ITEM-1", catalog))
 `,
+    notebookCells: [
+      {
+        id: 'setup',
+        kind: 'setup',
+        title: 'Setup Cell · School Store Catalog Dictionary',
+        description: 'Run this setup cell first (or click Run All Cells) so `catalog` and `item_codes` live in your shared Python kernel.',
+        starterCode: `# Setup Cell: Shared School Store Catalog
+catalog = {
+    "ITEM-1": {"name": "graphing calculator", "price": 89.99, "tags": ["math", "tech", "school"]},
+    "ITEM-2": {"name": "spiral notebook", "price": 4.50, "tags": ["writing", "school"]},
+    "ITEM-3": {"name": "usb flash drive", "price": 14.25, "tags": ["tech", "school"]},
+}
+item_codes = list(catalog.keys())
+print("Loaded catalog codes:", item_codes)`,
+        solutionCode: `# Setup Cell: Shared School Store Catalog
+catalog = {
+    "ITEM-1": {"name": "graphing calculator", "price": 89.99, "tags": ["math", "tech", "school"]},
+    "ITEM-2": {"name": "spiral notebook", "price": 4.50, "tags": ["writing", "school"]},
+    "ITEM-3": {"name": "usb flash drive", "price": 14.25, "tags": ["tech", "school"]},
+}
+item_codes = list(catalog.keys())
+print("Loaded catalog codes:", item_codes)`,
+      },
+      {
+        id: 'step-1',
+        kind: 'step',
+        stepNumber: 1,
+        title: 'Cell 1 · Slice Top Items',
+        starterCode: `# Cell 1 (Step 1): Return the first 'count' items using slicing
+def get_top_items(item_codes, count):
+    # TODO: Return item_codes[:count]
+    return []
+
+top_two = get_top_items(item_codes, 2)
+print("Top 2 items:", top_two)`,
+        solutionCode: `# Cell 1 (Step 1): Return the first 'count' items using slicing
+def get_top_items(item_codes, count):
+    return item_codes[:count]
+
+top_two = get_top_items(item_codes, 2)
+print("Top 2 items:", top_two)`,
+      },
+      {
+        id: 'step-2',
+        kind: 'step',
+        stepNumber: 2,
+        title: 'Cell 2 · Collect Unique Tags with a set()',
+        starterCode: `# Cell 2 (Step 2): Collect every unique tag from store_catalog into a set
+def get_unique_categories(store_catalog):
+    categories = set()
+    # TODO: Loop over store_catalog.values(), then item["tags"], and call categories.add(tag)
+    return categories
+
+unique_tags = get_unique_categories(catalog)
+print("Unique categories:", sorted(unique_tags))`,
+        solutionCode: `# Cell 2 (Step 2): Collect every unique tag from store_catalog into a set
+def get_unique_categories(store_catalog):
+    categories = set()
+    for item in store_catalog.values():
+        for tag in item.get("tags", []):
+            categories.add(tag)
+    return categories
+
+unique_tags = get_unique_categories(catalog)
+print("Unique categories:", sorted(unique_tags))`,
+      },
+      {
+        id: 'step-3',
+        kind: 'step',
+        stepNumber: 3,
+        title: 'Cell 3 · Format Price Labels',
+        starterCode: `# Cell 3 (Step 3): Format "[ITEM-1] GRAPHING CALCULATOR: $89.99"
+def format_price_label(code, store_catalog):
+    item = store_catalog.get(code)
+    if not item:
+        return "Not found"
+    # TODO: Set clean_name = item["name"].upper() and price = item["price"], then return formatted string
+    return ""
+
+receipt_line = format_price_label("ITEM-1", catalog)
+print("Receipt label:", receipt_line)`,
+        solutionCode: `# Cell 3 (Step 3): Format "[ITEM-1] GRAPHING CALCULATOR: $89.99"
+def format_price_label(code, store_catalog):
+    item = store_catalog.get(code)
+    if not item:
+        return "Not found"
+    clean_name = item["name"].upper()
+    price = item["price"]
+    return f"[{code}] {clean_name}: $" + f"{price:.2f}"
+
+receipt_line = format_price_label("ITEM-1", catalog)
+print("Receipt label:", receipt_line)`,
+      },
+    ],
     steps: [
       {
         stepNumber: 1,
         title: 'Step 1: Slice Top Items from a List',
-        taskInstruction: 'Go to get_top_items(item_codes, count) (lines 11-13). Replace return [] with return item_codes[:count].',
+        taskInstruction: 'In Cell 1 inside get_top_items(item_codes, count), replace return [] with return item_codes[:count].',
         targetObjectiveId: '3.1',
         patternTitle: 'Worked Pattern (Taking the First 2 Snacks)',
         patternCode: `snacks = ["apple", "chips", "cookie"]
@@ -478,7 +714,7 @@ first_two = snacks[:2]  # ["apple", "chips"]`,
       {
         stepNumber: 2,
         title: 'Step 2: Collect Unique Tags Using a set()',
-        taskInstruction: 'Inside get_unique_categories(store_catalog) (lines 17-20), loop over store_catalog.values(), then loop over item["tags"] and call categories.add(tag).',
+        taskInstruction: 'In Cell 2 inside get_unique_categories(store_catalog), loop over store_catalog.values(), then loop over item["tags"] and call categories.add(tag).',
         targetObjectiveId: '3.5',
         patternTitle: 'Worked Pattern (Deduplicating Club Names)',
         patternCode: `clubs = set()
@@ -499,7 +735,7 @@ for group in [{"tags": ["chess", "stem"]}, {"tags": ["stem", "art"]}]:
       {
         stepNumber: 3,
         title: 'Step 3: Format Price Labels with .upper() & :.2f',
-        taskInstruction: 'Inside format_price_label(code, store_catalog) (lines 24-29), set clean_name = item["name"].upper() and price = item["price"], then return f"[{code}] {clean_name}: $" + f"{price:.2f}".',
+        taskInstruction: 'In Cell 3 inside format_price_label(code, store_catalog), set clean_name = item["name"].upper() and price = item["price"], then return f"[{code}] {clean_name}: $" + f"{price:.2f}".',
         targetObjectiveId: '3.9',
         patternTitle: 'Worked Pattern (Formatting a Movie Ticket)',
         patternCode: `movie = {"name": "inception", "price": 12.5}
@@ -586,11 +822,88 @@ if __name__ == "__main__":
     print("10 / 0 =", safe_divide(10, 0))
     print("10 / abc =", safe_divide(10, "abc"))
 `,
+    notebookCells: [
+      {
+        id: 'step-1',
+        kind: 'step',
+        stepNumber: 1,
+        title: 'Cell 1 · Flexible Average with *scores & bonus=0',
+        starterCode: `# Cell 1 (Step 1): Compute average of any number of scores + bonus
+def average_score(*scores, bonus=0):
+    if not scores:
+        return 0.0
+    # TODO: Return round((sum(scores) / len(scores)) + bonus, 2)
+    return 0.0
+
+quiz_avg = average_score(80, 90, 100, bonus=2)
+print("Average with bonus:", quiz_avg)`,
+        solutionCode: `# Cell 1 (Step 1): Compute average of any number of scores + bonus
+def average_score(*scores, bonus=0):
+    if not scores:
+        return 0.0
+    avg = (sum(scores) / len(scores)) + bonus
+    return round(avg, 2)
+
+quiz_avg = average_score(80, 90, 100, bonus=2)
+print("Average with bonus:", quiz_avg)`,
+      },
+      {
+        id: 'step-2',
+        kind: 'step',
+        stepNumber: 2,
+        title: 'Cell 2 · Catch ZeroDivisionError in safe_divide()',
+        starterCode: `# Cell 2 (Step 2): Add try / except ZeroDivisionError inside safe_divide
+def safe_divide(a, b):
+    # TODO: try returning float(a) / float(b), except ZeroDivisionError return "Cannot divide by zero"
+    return None
+
+div_ok = safe_divide(10, 2)
+div_zero = safe_divide(10, 0)
+print("10 / 2 =", div_ok, "| 10 / 0 =", div_zero)`,
+        solutionCode: `# Cell 2 (Step 2): Add try / except ZeroDivisionError inside safe_divide
+def safe_divide(a, b):
+    try:
+        return float(a) / float(b)
+    except ZeroDivisionError:
+        return "Cannot divide by zero"
+
+div_ok = safe_divide(10, 2)
+div_zero = safe_divide(10, 0)
+print("10 / 2 =", div_ok, "| 10 / 0 =", div_zero)`,
+      },
+      {
+        id: 'step-3',
+        kind: 'step',
+        stepNumber: 3,
+        title: 'Cell 3 · Add ValueError & TypeError Guard',
+        starterCode: `# Cell 3 (Step 3): Expand safe_divide to also catch bad text/None inputs
+def safe_divide(a, b):
+    try:
+        return float(a) / float(b)
+    except ZeroDivisionError:
+        return "Cannot divide by zero"
+    # TODO: Add except (ValueError, TypeError): returning "Please enter numbers only"
+
+div_bad = safe_divide(10, "abc")
+print('10 / "abc" =', div_bad)`,
+        solutionCode: `# Cell 3 (Step 3): Expand safe_divide to also catch bad text/None inputs
+def safe_divide(a, b):
+    try:
+        return float(a) / float(b)
+    except ZeroDivisionError:
+        return "Cannot divide by zero"
+    except (ValueError, TypeError):
+        return "Please enter numbers only"
+
+div_bad = safe_divide(10, "abc")
+print('10 / "abc" =', div_bad)`,
+      },
+    ],
     steps: [
       {
         stepNumber: 1,
         title: 'Step 1: Flexible Average with *scores & bonus=0',
-        taskInstruction: 'Go to average_score(*scores, bonus=0) (lines 5-9). Replace return 0.0 with avg = (sum(scores) / len(scores)) + bonus and return round(avg, 2).',
+        taskInstruction: 'In Cell 1 inside average_score(*scores, bonus=0), compute avg = (sum(scores) / len(scores)) + bonus and return round(avg, 2).',
         targetObjectiveId: '4.4',
         patternTitle: 'Worked Pattern (Adding Any Number of Cart Items)',
         patternCode: `def total_with_tax(*prices, tax=0):
@@ -610,7 +923,7 @@ if __name__ == "__main__":
       {
         stepNumber: 2,
         title: 'Step 2: Catch ZeroDivisionError in safe_divide()',
-        taskInstruction: 'Inside safe_divide(a, b) (lines 16-18), replace return None with try: return float(a) / float(b) followed by except ZeroDivisionError: return "Cannot divide by zero".',
+        taskInstruction: 'In Cell 2 inside safe_divide(a, b), add try: return float(a) / float(b) followed by except ZeroDivisionError: return "Cannot divide by zero".',
         targetObjectiveId: '4.6',
         patternTitle: 'Worked Pattern (Guarding Against Zero)',
         patternCode: `def points_per_player(total, players):
@@ -631,7 +944,7 @@ if __name__ == "__main__":
       {
         stepNumber: 3,
         title: 'Step 3: Catch ValueError & TypeError',
-        taskInstruction: 'Right below except ZeroDivisionError:, add except (ValueError, TypeError): and return "Please enter numbers only".',
+        taskInstruction: 'In Cell 3 below except ZeroDivisionError:, add except (ValueError, TypeError): and return "Please enter numbers only".',
         targetObjectiveId: '4.7',
         patternTitle: 'Worked Pattern (Catching Two Bad Input Errors)',
         patternCode: `def double_text(val):
@@ -748,11 +1061,111 @@ if __name__ == "__main__":
     print("Summary:", summarize_scores(parsed))
     print("Raffle winner:", pick_raffle_winner(parsed))
 `,
+    notebookCells: [
+      {
+        id: 'setup',
+        kind: 'setup',
+        title: 'Setup Cell · Import math, random & Sample CSV Data',
+        description: 'Run this cell first so `math`, `random`, and `csv_data` stay active in your shared Python kernel.',
+        starterCode: `# Setup Cell: Standard Modules & Sample CSV Data
+import math
+import random
+
+csv_data = """Alice,88,94
+Bob,72,81
+Charlie,95,99
+Diana,61,68
+Evan,84,87"""
+
+print("Loaded math, random, and", len(csv_data.splitlines()), "CSV rows.")`,
+        solutionCode: `# Setup Cell: Standard Modules & Sample CSV Data
+import math
+import random
+
+csv_data = """Alice,88,94
+Bob,72,81
+Charlie,95,99
+Diana,61,68
+Evan,84,87"""
+
+print("Loaded math, random, and", len(csv_data.splitlines()), "CSV rows.")`,
+      },
+      {
+        id: 'step-1',
+        kind: 'step',
+        stepNumber: 1,
+        title: 'Cell 1 · Parse CSV Rows into Tuples',
+        starterCode: `# Cell 1 (Step 1): Split CSV rows into (name, average) tuples
+def parse_gradebook(raw_text):
+    records = []
+    # TODO: Loop over raw_text.strip().split("\\n"), split by ",", cast scores with float(), append (name, avg)
+    return records
+
+records = parse_gradebook(csv_data)
+print("Parsed records:", records)`,
+        solutionCode: `# Cell 1 (Step 1): Split CSV rows into (name, average) tuples
+def parse_gradebook(raw_text):
+    records = []
+    for line in raw_text.strip().split("\\n"):
+        parts = line.split(",")
+        name = parts[0]
+        avg = (float(parts[1]) + float(parts[2])) / 2.0
+        records.append((name, avg))
+    return records
+
+records = parse_gradebook(csv_data)
+print("Parsed records:", records)`,
+      },
+      {
+        id: 'step-2',
+        kind: 'step',
+        stepNumber: 2,
+        title: 'Cell 2 · Summarize High & Low with math',
+        starterCode: `# Cell 2 (Step 2): Uses 'records' from Cell 1!
+def summarize_scores(records):
+    # TODO: Gather averages = [r[1] for r in records] and use math.ceil / math.floor
+    return {"highest_ceil": 0, "lowest_floor": 0}
+
+summary = summarize_scores(records)
+print("Class summary:", summary)`,
+        solutionCode: `# Cell 2 (Step 2): Uses 'records' from Cell 1!
+def summarize_scores(records):
+    averages = [r[1] for r in records]
+    return {
+        "highest_ceil": math.ceil(max(averages)),
+        "lowest_floor": math.floor(min(averages)),
+    }
+
+summary = summarize_scores(records)
+print("Class summary:", summary)`,
+      },
+      {
+        id: 'step-3',
+        kind: 'step',
+        stepNumber: 3,
+        title: 'Cell 3 · Pick a Raffle Winner with random',
+        starterCode: `# Cell 3 (Step 3): Seed random(42) and pick a winner from 'records'
+def pick_raffle_winner(records):
+    # TODO: Call random.seed(42) and return random.choice([r[0] for r in records])
+    return ""
+
+winner = pick_raffle_winner(records)
+print("Raffle winner:", winner)`,
+        solutionCode: `# Cell 3 (Step 3): Seed random(42) and pick a winner from 'records'
+def pick_raffle_winner(records):
+    random.seed(42)
+    names = [r[0] for r in records]
+    return random.choice(names)
+
+winner = pick_raffle_winner(records)
+print("Raffle winner:", winner)`,
+      },
+    ],
     steps: [
       {
         stepNumber: 1,
         title: 'Step 1: Parse CSV Rows into (name, avg) Tuples',
-        taskInstruction: 'Inside parse_gradebook(raw_text) (lines 14-18), loop over raw_text.strip().split("\\n"), split each line by ",", convert parts[1] and parts[2] with float(), and append (parts[0], (s1 + s2) / 2.0).',
+        taskInstruction: 'In Cell 1 inside parse_gradebook(raw_text), loop over raw_text.strip().split("\\n"), split each line by ",", convert parts[1] and parts[2] with float(), and append (parts[0], (s1 + s2) / 2.0).',
         targetObjectiveId: '5.3',
         patternTitle: 'Worked Pattern (Parsing One CSV Row)',
         patternCode: `row = "Sam,80,90".split(",")  # ["Sam", "80", "90"]
@@ -771,7 +1184,7 @@ record = (row[0], avg)      # ("Sam", 85.0)`,
       {
         stepNumber: 2,
         title: 'Step 2: Round Highs & Lows with math.ceil / math.floor',
-        taskInstruction: 'Inside summarize_scores(records) (lines 22-24), build averages = [r[1] for r in records] and return {"highest_ceil": math.ceil(max(averages)), "lowest_floor": math.floor(min(averages))}.',
+        taskInstruction: 'In Cell 2 inside summarize_scores(records), build averages = [r[1] for r in records] and return {"highest_ceil": math.ceil(max(averages)), "lowest_floor": math.floor(min(averages))}.',
         targetObjectiveId: '5.5',
         patternTitle: 'Worked Pattern (Rounding Up and Down)',
         patternCode: `import math
@@ -791,7 +1204,7 @@ low = math.floor(min(nums))   # 64`,
       {
         stepNumber: 3,
         title: 'Step 3: Pick a Raffle Winner with random.choice()',
-        taskInstruction: 'Inside pick_raffle_winner(records) (lines 28-30), call random.seed(42), collect names = [r[0] for r in records], and return random.choice(names).',
+        taskInstruction: 'In Cell 3 inside pick_raffle_winner(records), call random.seed(42), collect names = [r[0] for r in records], and return random.choice(names).',
         targetObjectiveId: '5.4',
         patternTitle: 'Worked Pattern (Repeatable Random Pick)',
         patternCode: `import random
@@ -885,11 +1298,108 @@ if __name__ == "__main__":
     print("With symbols:", caesar_cipher("Hello, World!", 5))
     print("Decoded:", caesar_cipher("PCEP", -3))
 `,
+    notebookCells: [
+      {
+        id: 'step-1',
+        kind: 'step',
+        stepNumber: 1,
+        title: 'Cell 1 · Shift Uppercase Letters (A–Z)',
+        starterCode: `# Cell 1 (Step 1): Shift uppercase letters using ord(), % 26, and chr()
+def caesar_cipher(text, shift):
+    result = []
+    for char in text:
+        if char.isupper():
+            base = ord("A")
+            # TODO: Replace char with chr((ord(char) - base + shift) % 26 + base)
+            new_char = char
+            result.append(new_char)
+        else:
+            result.append(char)
+    return "".join(result)
+
+encoded_upper = caesar_cipher("PYTHON", 3)
+print("Encoded uppercase:", encoded_upper)`,
+        solutionCode: `# Cell 1 (Step 1): Shift uppercase letters using ord(), % 26, and chr()
+def caesar_cipher(text, shift):
+    result = []
+    for char in text:
+        if char.isupper():
+            base = ord("A")
+            new_char = chr((ord(char) - base + shift) % 26 + base)
+            result.append(new_char)
+        else:
+            result.append(char)
+    return "".join(result)
+
+encoded_upper = caesar_cipher("PYTHON", 3)
+print("Encoded uppercase:", encoded_upper)`,
+      },
+      {
+        id: 'step-2',
+        kind: 'step',
+        stepNumber: 2,
+        title: 'Cell 2 · Add Lowercase Letters (a–z) & Keep Symbols',
+        starterCode: `# Cell 2 (Step 2): Expand caesar_cipher to shift lowercase letters too
+def caesar_cipher(text, shift):
+    result = []
+    for char in text:
+        if char.isupper():
+            base = ord("A")
+            result.append(chr((ord(char) - base + shift) % 26 + base))
+        elif char.islower():
+            base = ord("a")
+            # TODO: Replace char with chr((ord(char) - base + shift) % 26 + base)
+            new_char = char
+            result.append(new_char)
+        else:
+            result.append(char)
+    return "".join(result)
+
+encoded_mixed = caesar_cipher("Hello, World!", 5)
+print("Encoded with punctuation:", encoded_mixed)`,
+        solutionCode: `# Cell 2 (Step 2): Expand caesar_cipher to shift lowercase letters too
+def caesar_cipher(text, shift):
+    result = []
+    for char in text:
+        if char.isupper():
+            base = ord("A")
+            result.append(chr((ord(char) - base + shift) % 26 + base))
+        elif char.islower():
+            base = ord("a")
+            new_char = chr((ord(char) - base + shift) % 26 + base)
+            result.append(new_char)
+        else:
+            result.append(char)
+    return "".join(result)
+
+encoded_mixed = caesar_cipher("Hello, World!", 5)
+print("Encoded with punctuation:", encoded_mixed)`,
+      },
+      {
+        id: 'step-3',
+        kind: 'step',
+        stepNumber: 3,
+        title: 'Cell 3 · Decode Backward with Negative Shifts',
+        starterCode: `# Cell 3 (Step 3): Uses caesar_cipher() from Cell 2 to decode backward!
+def decode_cipher(text, shift):
+    # TODO: Replace "" by calling caesar_cipher(text, -shift)
+    return ""
+
+decoded = decode_cipher("PCEP", 3)
+print("Decoded PCEP (shift -3):", decoded)`,
+        solutionCode: `# Cell 3 (Step 3): Uses caesar_cipher() from Cell 2 to decode backward!
+def decode_cipher(text, shift):
+    return caesar_cipher(text, -shift)
+
+decoded = decode_cipher("PCEP", 3)
+print("Decoded PCEP (shift -3):", decoded)`,
+      },
+    ],
     steps: [
       {
         stepNumber: 1,
         title: 'Step 1: Shift Uppercase Letters (A-Z)',
-        taskInstruction: 'Under if char.isupper(): (lines 9-13), replace new_char = char with new_char = chr((ord(char) - base + shift) % 26 + base).',
+        taskInstruction: 'In Cell 1 under if char.isupper():, replace new_char = char with new_char = chr((ord(char) - base + shift) % 26 + base).',
         targetObjectiveId: '3.8',
         patternTitle: 'Worked Pattern (Shifting 1 Letter Forward)',
         patternCode: `base = ord("A")                 # 65
@@ -909,7 +1419,7 @@ letter = chr(wrapped + base)    # chr(66) = "B"`,
       {
         stepNumber: 2,
         title: 'Step 2: Shift Lowercase Letters (a-z) & Keep Symbols',
-        taskInstruction: 'Under elif char.islower(): (lines 16-20), replace new_char = char with new_char = chr((ord(char) - base + shift) % 26 + base).',
+        taskInstruction: 'In Cell 2 under elif char.islower():, replace new_char = char with new_char = chr((ord(char) - base + shift) % 26 + base).',
         targetObjectiveId: '3.9',
         patternTitle: 'Worked Pattern (Lowercase Base "a" = 97)',
         patternCode: `base = ord("a")                 # 97
@@ -928,22 +1438,22 @@ letter = chr(wrapped + base)    # chr(98) = "b"`,
       },
       {
         stepNumber: 3,
-        title: 'Step 3: Join Characters & Verify Reverse Decoding',
-        taskInstruction: 'At the bottom of caesar_cipher (lines 25-27), replace return "" with return "".join(result). Negative shifts like -3 automatically decode backward!',
+        title: 'Step 3: Decode Backward with Negative Shifts',
+        taskInstruction: 'In Cell 3 inside decode_cipher(text, shift), replace return "" with return caesar_cipher(text, -shift) using the function you defined in Cell 2.',
         targetObjectiveId: '3.1',
-        patternTitle: 'Worked Pattern (Joining a Character List)',
-        patternCode: `letters = ["P", "y", "3"]
-word = "".join(letters)   # "Py3"
-# Negative shift wrap: (-3) % 26 == 23`,
-        patternExplanation: '"".join(result) combines every single-character string inside result into one complete string with no extra spaces.',
-        expectedExample: 'caesar_cipher("PCEP", -3) -> "MZBM"',
-        diagnosticExpr: 'caesar_cipher("PCEP", -3)',
+        patternTitle: 'Worked Pattern (Reversing a Shift)',
+        patternCode: `def decode_word(word, shift):
+    return caesar_cipher(word, -shift)
+# (-3) % 26 == 23 automatically wraps backward!`,
+        patternExplanation: 'Because Python modulo always wraps cleanly for 26 (e.g. (-3) % 26 == 23), passing -shift into caesar_cipher() reverses the scramble.',
+        expectedExample: 'decode_cipher("PCEP", 3) -> "MZBM"',
+        diagnosticExpr: 'decode_cipher("PCEP", 3) if "decode_cipher" in globals() else caesar_cipher("PCEP", -3)',
         breadcrumbs: {
-          level1Concept: 'Because Python modulo always returns a positive remainder for 26 (e.g. (-3) % 26 == 23), negative shifts decode backward without extra code.',
-          level2Syntax: 'return "".join(result)',
-          level3Scaffold: 'return "".join(result)',
+          level1Concept: 'Cell 3 shares the same Python kernel as Cell 2, so decode_cipher can directly call caesar_cipher(text, -shift).',
+          level2Syntax: 'return caesar_cipher(text, -shift)',
+          level3Scaffold: 'def decode_cipher(text, shift):\n    return caesar_cipher(text, -shift)',
         },
-        validationSnippet: 'assert caesar_cipher("PCEP", -3) == "MZBM"',
+        validationSnippet: 'assert caesar_cipher("PCEP", -3) == "MZBM" and (True if "decode_cipher" not in globals() else decode_cipher("PCEP", 3) == "MZBM")',
       },
     ],
   },
