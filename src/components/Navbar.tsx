@@ -194,18 +194,6 @@ export const Navbar: React.FC = () => {
           </button>
 
           <button
-            onClick={() => setActiveView('guide')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
-              activeView === 'guide'
-                ? 'bg-[#5A1827] text-[#F5F5DC] font-semibold shadow-xs'
-                : 'text-[#2C3E50]/80 dark:text-[#BDC3C7] hover:bg-white/60 dark:hover:bg-[#243342]/60'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Project Guide</span>
-          </button>
-
-          <button
             onClick={() => setActiveView('portfolio')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
               activeView === 'portfolio'

@@ -364,27 +364,6 @@ function simulatePythonCode(code: string, startTime: number): ExecutionResult {
               : '__STEP_RESULT__:3:FAIL:Returned "" — call random.seed(42) and return random.choice(names)'
           );
         }
-        // Lab 6 (CLI Cipher) checks
-        else if (code.includes('def caesar_cipher')) {
-          const fnBody = extractFnBody('caesar_cipher');
-          const hasShiftFormula = fnBody.includes('chr(') && fnBody.includes('ord(') && fnBody.includes('% 26');
-          const hasJoin = fnBody.includes('"".join(result)') || fnBody.includes("''.join(result)");
-          outputLines.push(
-            hasShiftFormula && hasJoin
-              ? '__STEP_RESULT__:1:PASS'
-              : '__STEP_RESULT__:1:FAIL:Update if char.isupper() with chr((ord(char) - base + shift) % 26 + base) and return "".join(result)'
-          );
-          outputLines.push(
-            (fnBody.match(/% 26/g) || []).length >= 2 && hasJoin
-              ? '__STEP_RESULT__:2:PASS'
-              : '__STEP_RESULT__:2:FAIL:Update elif char.islower() with chr((ord(char) - base + shift) % 26 + base)'
-          );
-          outputLines.push(
-            hasJoin && !fnBody.includes('return ""\n')
-              ? '__STEP_RESULT__:3:PASS'
-              : '__STEP_RESULT__:3:FAIL:Returned "" — replace return "" with return "".join(result)'
-          );
-        }
       } else if (code.includes('celsius_to_fahrenheit')) {
         outputLines.push('Road Trip Summary: -> 77.0 F | 2 stops | 50 mi left\n[Done]');
       } else if (code.includes('filter_scores')) {
@@ -395,8 +374,6 @@ function simulatePythonCode(code: string, startTime: number): ExecutionResult {
         outputLines.push('Average with bonus: 92.0\n10 / 2 = 5.0\n10 / 0 = Cannot divide by zero\n10 / abc = Please enter numbers only');
       } else if (code.includes('parse_gradebook')) {
         outputLines.push("Parsed gradebook: [('Alice', 91.0), ('Bob', 76.5), ('Charlie', 97.0), ('Diana', 64.5), ('Evan', 85.5)]\nSummary: {'highest_ceil': 97, 'lowest_floor': 64}\nRaffle winner: Charlie");
-      } else if (code.includes('caesar_cipher')) {
-        outputLines.push('Encoded: SBWKRQ\nWith symbols: Mjqqt, Btwqi!\nDecoded: MZBM');
       } else {
         outputLines.push('Program evaluated.');
       }

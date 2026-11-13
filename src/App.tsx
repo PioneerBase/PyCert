@@ -4,7 +4,6 @@ import { Navbar } from './components/Navbar';
 import { HomeDashboard } from './components/HomeDashboard';
 import { CurriculumView } from './components/CurriculumView';
 import { Workspace } from './components/Workspace';
-import { ProjectGuide } from './components/ProjectGuide';
 import { FlashcardsView } from './components/FlashcardsView';
 import { ExamSimulator } from './components/ExamSimulator';
 import { PortfolioManager } from './components/PortfolioManager';
@@ -22,7 +21,6 @@ const MainContent: React.FC = () => {
       {activeView === 'home' && <HomeDashboard />}
       {activeView === 'curriculum' && <CurriculumView />}
       {activeView === 'workspace' && <Workspace />}
-      {activeView === 'guide' && <ProjectGuide />}
       {activeView === 'portfolio' && <PortfolioManager />}
       {activeView === 'flashcards' && <FlashcardsView />}
       {activeView === 'exam' && <ExamSimulator />}

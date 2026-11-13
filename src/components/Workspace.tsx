@@ -86,7 +86,7 @@ export const Workspace: React.FC = () => {
   }, [terminalOutput]);
 
   const codeLines = currentCode.split('\n');
-  const gutterLineCount = Math.max(codeLines.length + 12, 32);
+  const gutterLineCount = Math.max(28, codeLines.length + 12);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = textareaRef.current;
@@ -387,15 +387,6 @@ ${summaryFooter}
           <div className="px-3 py-2 rounded-lg bg-[#FAF9F5] dark:bg-[#1A2634] border border-[#BDC3C7] dark:border-[#2C3E50] text-xs font-mono font-semibold text-[#2C3E50] dark:text-[#F5F5DC] tabular-nums">
             Progress: <strong className="text-[#1E3A78] dark:text-amber-300">{progressPct}% ({completedCount}/{totalSteps})</strong>
           </div>
-
-          <button
-            onClick={() => setActiveView('guide')}
-            className="px-3.5 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-            title="Open Interactive CLI Cipher Walkthrough"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-amber-300" />
-            <span>Project Guide</span>
-          </button>
 
           <button
             onClick={() => setIsBreadcrumbsOpen(true)}
@@ -748,14 +739,14 @@ ${summaryFooter}
               </div>
             </div>
 
-            {/* Code Content Area - Expands to fill available viewport height */}
+            {/* Code Content Area - Full 540px Explicit Scrollable IDE Viewport */}
             {activeTab === 'source' ? (
-              <div className="flex min-h-[540px] h-[calc(100vh-19rem)] bg-[#1E2936]">
+              <div className="flex h-[540px] bg-[#1E2936]">
                 {/* Scroll-Synced Line Numbers Gutter */}
                 <div
                   ref={gutterRef}
                   onClick={() => textareaRef.current?.focus()}
-                  className="w-12 h-full overflow-hidden py-4 pb-16 pl-2 pr-3 select-none text-right font-mono text-[13px] leading-6 text-[#BDC3C7]/45 border-r border-[#2C3E50] bg-[#18222D] shrink-0 tabular-nums cursor-text"
+                  className="w-12 h-[540px] overflow-hidden py-4 pb-16 pl-2 pr-3 select-none text-right font-mono text-[13px] leading-6 text-[#BDC3C7]/45 border-r border-[#2C3E50] bg-[#18222D] shrink-0 tabular-nums cursor-text"
                 >
                   {Array.from({ length: gutterLineCount }, (_, i) => (
                     <div key={i} className="h-6 leading-6">
@@ -780,11 +771,11 @@ ${summaryFooter}
                   autoCapitalize="off"
                   autoComplete="off"
                   aria-label="Python code editor"
-                  className="flex-1 block w-full h-full py-4 px-4 font-mono text-[13px] leading-6 text-[#F5F5DC] bg-[#1E2936] resize-none overflow-y-auto overflow-x-auto focus:outline-hidden whitespace-pre selection:bg-[#1E3A78]/70 selection:text-[#F5F5DC]"
+                  className="flex-1 block w-full h-[540px] py-4 px-4 font-mono text-[13px] leading-6 text-[#F5F5DC] bg-[#1E2936] resize-none overflow-y-auto overflow-x-auto focus:outline-hidden whitespace-pre selection:bg-[#1E3A78]/70 selection:text-[#F5F5DC]"
                 />
               </div>
             ) : activeTab === 'tests' ? (
-              <div className="p-5 font-mono text-[13px] text-[#F5F5DC] bg-[#1E2936] min-h-[540px] h-[calc(100vh-19rem)] overflow-y-auto leading-6">
+              <div className="p-5 font-mono text-[13px] text-[#F5F5DC] bg-[#1E2936] h-[520px] overflow-y-auto leading-6">
                 <pre className="whitespace-pre-wrap">{`# Automated checks run when you click "Run Tests"\n\n` +
                   currentProject.steps
                     .map(
@@ -794,7 +785,7 @@ ${summaryFooter}
                     .join('\n\n')}</pre>
               </div>
             ) : (
-              <div className="p-5 font-mono text-xs text-[#F5F5DC] bg-[#1E2936] min-h-[540px] h-[calc(100vh-19rem)] overflow-y-auto leading-relaxed space-y-4">
+              <div className="p-5 font-mono text-xs text-[#F5F5DC] bg-[#1E2936] h-[520px] overflow-y-auto leading-relaxed space-y-4">
                 <h4 className="font-bold text-sm text-amber-400">
                   # {currentProject.title} — Step-by-Step Guide
                 </h4>

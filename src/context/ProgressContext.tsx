@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { MicroProject, Flashcard, ChecklistItem, UserProgressState, UserProfile, StreakData } from '../types';
 import { MICRO_PROJECTS, INITIAL_FLASHCARDS, INITIAL_CHECKLIST_ITEMS } from '../data/pcepCurriculum';
 
-export type AppView = 'home' | 'curriculum' | 'workspace' | 'guide' | 'flashcards' | 'exam' | 'portfolio';
+export type AppView = 'home' | 'curriculum' | 'workspace' | 'flashcards' | 'exam' | 'portfolio';
 
 interface ProgressContextType {
   activeView: AppView;
