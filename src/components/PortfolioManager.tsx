@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 export const PortfolioManager: React.FC = () => {
-  const { setActiveView, selectProject, currentUser } = useProgress();
+  const { setActiveView, selectProject, currentUser, completedStepsMap } = useProgress();
   const [filterStatus, setFilterStatus] = useState<'all' | 'synced' | 'ready' | 'draft'>('all');
   const [isReadmeModalOpen, setIsReadmeModalOpen] = useState<boolean>(false);
   const [telemetryLines, setTelemetryLines] = useState<string[]>([
@@ -29,24 +29,66 @@ export const PortfolioManager: React.FC = () => {
     `origin https://github.com/${currentUser.githubHandle || 'candidate'}/pycert-pcep.git (fetch)`,
     `origin https://github.com/${currentUser.githubHandle || 'candidate'}/pycert-pcep.git (push)`,
     '$ pytest --tb=line tests/',
-    '==== 18 passed, 0 warnings in 0.24s ====',
+    '==== Ready: Complete Domain Labs in the IDE to verify tests ====',
   ]);
   const [syncing, setSyncing] = useState<boolean>(false);
   const [syncedSuccess, setSyncedSuccess] = useState<boolean>(false);
 
+  // Map each capstone to its matching hands-on lab
+  const capstoneToLabId: Record<string, string> = {
+    'cap-01-pycalc-cli': 'proj-01-converter',
+    'cap-02-flowmaster': 'proj-02-sentinel-loops',
+    'cap-03-collection-crafter': 'proj-03-collections-strings',
+    'cap-04-custom-exception': 'proj-04-functions-exceptions',
+    'cap-05-file-stream-audit': 'proj-05-files-modules',
+  };
+
+  // Derive real progress per capstone from completedStepsMap
+  const dynamicProjects = CAPSTONE_PROJECTS.map((proj) => {
+    const labId = capstoneToLabId[proj.id] || 'proj-01-converter';
+    const doneSteps = completedStepsMap[labId]?.length || 0;
+    const totalSteps = 3;
+    const pct = Math.min(100, Math.round((doneSteps / totalSteps) * 100));
+    const computedStatus: 'synced' | 'ready' | 'draft' =
+      doneSteps >= totalSteps ? 'synced' : doneSteps > 0 ? 'ready' : 'draft';
+    const computedLabel =
+      doneSteps >= totalSteps
+        ? 'COMPLETE'
+        : doneSteps > 0
+        ? 'IN PROGRESS'
+        : 'READY TO BUILD';
+
+    return {
+      ...proj,
+      labId,
+      doneSteps,
+      totalSteps,
+      status: computedStatus,
+      statusLabel: computedLabel,
+      coveragePercent: pct,
+      unitTestsPassing: `${doneSteps}/${totalSteps}`,
+    };
+  });
+
+  const readyReposCount = dynamicProjects.filter((p) => p.status === 'synced').length;
+  const totalPassedTests = dynamicProjects.reduce((acc, p) => acc + p.doneSteps, 0);
+  const totalPossibleTests = dynamicProjects.reduce((acc, p) => acc + p.totalSteps, 0);
+  const overallPassPct =
+    totalPossibleTests > 0 ? Math.round((totalPassedTests / totalPossibleTests) * 100) : 0;
+
   const preFlightItems = [
-    { id: 1, title: 'Virtualenv & Requirements', desc: 'requirements.txt pinned to Python 3.10+', met: true },
-    { id: 2, title: 'Standard Folder Layout', desc: "Dedicated 'src/', 'tests/', & 'docs/'", met: true },
-    { id: 3, title: 'Automated Unit Suite', desc: "PCEP boundary corner tests in 'pytest'", met: true },
-    { id: 4, title: 'Markdown README Badges', desc: 'Constructed via README Architect', met: true },
-    { id: 5, title: 'License & .gitignore', desc: 'MIT permissive with bytecode ignore', met: false },
-    { id: 6, title: 'Tag Release on Main', desc: "Annotated git tag 'v1.0.0-pcep-certified'", met: false },
+    { id: 1, title: 'Python 3.10+ Setup', desc: 'Clean starter files ready to run', met: true },
+    { id: 2, title: 'Organized Folder Layout', desc: 'Separate lab files and test checks', met: true },
+    { id: 3, title: 'Automated Step Tests', desc: 'Pass all 3 chronological checks per lab', met: readyReposCount === dynamicProjects.length },
+    { id: 4, title: 'Clear README Summary', desc: 'Generated with README Architect', met: false },
+    { id: 5, title: 'License & .gitignore', desc: 'Keeps temporary cache files out of Git', met: false },
+    { id: 6, title: 'Final GitHub Push', desc: 'Sync completed labs to your profile', met: syncedSuccess },
   ];
 
   const filteredProjects =
     filterStatus === 'all'
-      ? CAPSTONE_PROJECTS
-      : CAPSTONE_PROJECTS.filter((p) => p.status === filterStatus);
+      ? dynamicProjects
+      : dynamicProjects.filter((p) => p.status === filterStatus);
 
   const handleBatchSync = () => {
     setSyncing(true);
@@ -165,20 +207,20 @@ export const PortfolioManager: React.FC = () => {
             {/* Quick Metrics */}
             <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-[#BDC3C7]/40 dark:border-[#2C3E50]">
               <div className="p-3 rounded-xl bg-white dark:bg-[#1A2634] border border-[#BDC3C7]/60 dark:border-[#2C3E50] text-center">
-                <div className="text-xl font-extrabold text-[#2C3E50] dark:text-[#F5F5DC] font-mono">
-                  4 / 5
+                <div className="text-xl font-extrabold text-[#2C3E50] dark:text-[#F5F5DC] font-mono tabular-nums">
+                  {readyReposCount} / {dynamicProjects.length}
                 </div>
                 <div className="text-[10px] text-[#2C3E50]/70 dark:text-[#BDC3C7] font-mono mt-0.5">
-                  Repos Ready
+                  Projects Complete
                 </div>
               </div>
 
               <div className="p-3 rounded-xl bg-white dark:bg-[#1A2634] border border-[#BDC3C7]/60 dark:border-[#2C3E50] text-center">
-                <div className="text-xl font-extrabold text-emerald-700 dark:text-emerald-400 font-mono">
-                  100%
+                <div className="text-xl font-extrabold text-emerald-700 dark:text-emerald-400 font-mono tabular-nums">
+                  {overallPassPct}%
                 </div>
                 <div className="text-[10px] text-[#2C3E50]/70 dark:text-[#BDC3C7] font-mono mt-0.5">
-                  Lab Tests Passing
+                  Lab Checks Passing
                 </div>
               </div>
             </div>
@@ -191,7 +233,7 @@ export const PortfolioManager: React.FC = () => {
                 Pre-Flight Audit
               </span>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#1E3A78]/15 dark:bg-[#1E3A78]/40 text-[#1E3A78] dark:text-[#F5F5DC]">
-                4 of 6 Met
+                {preFlightItems.filter((i) => i.met).length} of {preFlightItems.length} Met
               </span>
             </div>
 
@@ -277,18 +319,18 @@ export const PortfolioManager: React.FC = () => {
                 Syllabus Capstone Projects
               </h2>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#1E3A78]/15 dark:bg-[#1E3A78]/40 text-[#1E3A78] dark:text-[#F5F5DC]">
-                5 Domains (5/5 Complete)
+                5 Domains ({readyReposCount}/5 Complete)
               </span>
             </div>
 
-            {/* Filter Pills */}
+            {/* Filter Tabs */}
             <div className="flex items-center gap-1.5 p-1 bg-[#EBE9DF] dark:bg-[#1A2634] rounded-lg text-xs border border-[#BDC3C7]/60 dark:border-[#2C3E50]">
               {(
                 [
-                  { id: 'all', label: `All (${CAPSTONE_PROJECTS.length})` },
-                  { id: 'synced', label: `Synced (${CAPSTONE_PROJECTS.filter((p) => p.status === 'synced').length})` },
-                  { id: 'ready', label: `Ready (${CAPSTONE_PROJECTS.filter((p) => p.status === 'ready').length})` },
-                  { id: 'draft', label: `Drafts (${CAPSTONE_PROJECTS.filter((p) => p.status === 'draft').length})` },
+                  { id: 'all', label: `All (${dynamicProjects.length})` },
+                  { id: 'synced', label: `Complete (${dynamicProjects.filter((p) => p.status === 'synced').length})` },
+                  { id: 'ready', label: `In Progress (${dynamicProjects.filter((p) => p.status === 'ready').length})` },
+                  { id: 'draft', label: `Not Started (${dynamicProjects.filter((p) => p.status === 'draft').length})` },
                 ] as const
               ).map((tab) => (
                 <button
@@ -383,7 +425,15 @@ export const PortfolioManager: React.FC = () => {
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => selectProject(project.labId)}
+                      className="px-3.5 py-1.5 text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Code2 className="w-3.5 h-3.5" />
+                      <span>Open Lab in IDE</span>
+                    </button>
+
                     <button
                       onClick={() => setIsReadmeModalOpen(true)}
                       className="px-3 py-1.5 text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-white dark:bg-[#1A2634] hover:bg-[#EBE9DF] dark:hover:bg-[#1E2936] border border-[#BDC3C7] dark:border-[#2C3E50] rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
@@ -397,7 +447,7 @@ export const PortfolioManager: React.FC = () => {
                         href={`https://github.com/${currentUser.githubHandle || 'pcep-candidate'}/${project.githubRepoUrl.split('/').pop() || project.id}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="px-3.5 py-1.5 text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] rounded-lg shadow-xs transition-colors flex items-center gap-1"
+                        className="px-3.5 py-1.5 text-xs font-semibold text-[#F5F5DC] bg-[#5A1827] hover:bg-[#48121E] rounded-lg shadow-xs transition-colors flex items-center gap-1"
                       >
                         <span>View GitHub Repo</span>
                         <ExternalLink className="w-3 h-3" />

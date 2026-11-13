@@ -91,320 +91,348 @@ export const PCEP_SECTIONS: PcepSection[] = [
 export const MICRO_PROJECTS: MicroProject[] = [
   {
     id: 'proj-01-converter',
-    title: 'CLI Scientific Unit & Thermal Metric Engine',
+    title: 'Road Trip & Weather Converter',
     sectionNumber: 1,
     sectionName: 'Computer Programming & Python Fundamentals',
     examWeightPercentage: 17,
     difficulty: 'Beginner',
-    estimatedMinutes: 25,
+    estimatedMinutes: 15,
     specificObjectives: ['1.3', '1.4', '1.5', '1.6'],
-    description: 'Build a terminal-based scientific unit converter demonstrating floating-point numeric operations, operator precedence, type casting from input(), and formatted console output with sep and end arguments.',
+    fileName: 'road_trip_math.py',
+    testFileName: 'test_road_trip_math.py',
+    keyTip: 'Parentheses () always run first, then ** (exponents), then *, /, //, %, and finally + and -.',
+    pitfallWarning: 'Remember: input() always returns a string (str). Always convert text numbers with float() or int() before doing math, and remember / gives a float while // gives whole-number floor division.',
+    description: 'Build a beginner-friendly Python calculator that converts Celsius to Fahrenheit, calculates road-trip fuel stops with floor division (//) and remainder (%), and prints clean output with sep and end.',
     learningOutcomes: [
-      'Master explicit casting from string inputs via float() and int()',
-      'Verify operator precedence with exponentiation (**) and floor division (//)',
-      'Control console layout precisely using print(..., sep=" | ", end="\\n")',
-      'Avoid floating-point rounding pitfalls using round() and format strings',
+      'Convert values safely using float() and int()',
+      'Use floor division (//), remainder (%), and exponents (**)',
+      'Follow Python operator precedence rules accurately',
+      'Format print() output with sep and end arguments',
     ],
-    starterCode: `# CLI Scientific Unit & Thermal Metric Engine
-# PCEP-30-03 Section 01: Fundamentals, Operators & Console I/O
+    starterCode: `# Lab 01: Road Trip & Weather Converter (PCEP Domain 1)
+# Follow Step 1 -> Step 2 -> Step 3 in order from top to bottom!
 
-def convert_temperature(celsius_val):
-    # Step 1: Calculate Fahrenheit using exact operator precedence: (C * 9/5) + 32
-    # Ensure float precision
-    fahrenheit = 0.0 # TODO: Implement calculation
+# STEP 1: Convert Celsius to Fahrenheit
+# Formula: (celsius * 9 / 5) + 32
+def celsius_to_fahrenheit(celsius):
+    # TODO (Step 1): Convert celsius to float() and return Fahrenheit
+    fahrenheit = 0.0
     return fahrenheit
 
-def calculate_energy(mass_kg, velocity_ms):
-    # Step 2: Kinetic energy formula: 0.5 * m * v^2
-    # Use the exponentiation operator (**)
-    energy_joules = 0.0 # TODO: Implement calculation
-    return energy_joules
 
-def run_conversion_suite():
-    print("=== PyCert Thermal & Physics Suite ===", sep="---")
-    
-    # Test values
-    c_temp = 25.0
-    f_temp = convert_temperature(c_temp)
-    
-    # Print with custom sep and end
-    print("Celsius:", c_temp, "=> Fahrenheit:", f_temp, sep=" ")
-    
-    m = 12.5
-    v = 4.0
-    ke = calculate_energy(m, v)
-    print("Kinetic Energy:", ke, "Joules", sep=": ", end="\\n[Done]\\n")
+# STEP 2: Calculate full fuel stops and leftover miles
+# Hint: Use // for whole stops and % for leftover miles
+def trip_fuel_stops(total_miles, miles_per_tank):
+    # TODO (Step 2): Replace the 0s with // and % math
+    full_stops = 0
+    leftover_miles = 0
+    return (full_stops, leftover_miles)
+
+
+# STEP 3: Print a neat summary using sep=" | " and end="\\n[Done]\\n"
+def show_summary():
+    temp_f = celsius_to_fahrenheit(25)
+    stops, extra = trip_fuel_stops(650, 300)
+    # TODO (Step 3): Update sep and end in the print() call below
+    print("Temp (F):", temp_f, "Stops:", stops, "Extra miles:", extra)
+
 
 if __name__ == "__main__":
-    run_conversion_suite()
+    show_summary()
 `,
-    solutionCode: `# Solution: CLI Scientific Unit & Thermal Metric Engine
-def convert_temperature(celsius_val):
-    # Operators: * has higher precedence than +, but parentheses guarantee clarity
-    return (float(celsius_val) * 9 / 5) + 32
+    solutionCode: `# Solution: Road Trip & Weather Converter (PCEP Domain 1)
 
-def calculate_energy(mass_kg, velocity_ms):
-    # Exponentiation ** has higher precedence than multiplication *
-    return 0.5 * float(mass_kg) * (float(velocity_ms) ** 2)
+def celsius_to_fahrenheit(celsius):
+    return (float(celsius) * 9 / 5) + 32
 
-def run_conversion_suite():
-    print("=== PyCert Thermal & Physics Suite ===")
-    c_temp = 25.0
-    f_temp = convert_temperature(c_temp)
-    print("Celsius:", c_temp, "=> Fahrenheit:", f_temp, sep=" ")
-    
-    m = 12.5
-    v = 4.0
-    ke = calculate_energy(m, v)
-    print("Kinetic Energy:", ke, "Joules", sep=": ", end="\\n[Done]\\n")
+def trip_fuel_stops(total_miles, miles_per_tank):
+    full_stops = int(total_miles) // int(miles_per_tank)
+    leftover_miles = int(total_miles) % int(miles_per_tank)
+    return (full_stops, leftover_miles)
+
+def show_summary():
+    temp_f = celsius_to_fahrenheit(25)
+    stops, extra = trip_fuel_stops(650, 300)
+    print("Temp (F):", temp_f, "Stops:", stops, "Extra miles:", extra, sep=" | ", end="\\n[Done]\\n")
 
 if __name__ == "__main__":
-    run_conversion_suite()
+    show_summary()
 `,
     steps: [
       {
         stepNumber: 1,
-        title: 'Thermal Conversion with Proper Operator Precedence',
-        taskInstruction: 'Implement convert_temperature(celsius_val) using the formula: (celsius * 9/5) + 32. Cast celsius_val to float to guarantee precision.',
-        targetObjectiveId: '1.4',
+        title: 'Step 1: Convert Celsius to Fahrenheit',
+        taskInstruction: 'Inside celsius_to_fahrenheit(celsius), convert celsius to float(celsius) and return (float(celsius) * 9 / 5) + 32.',
+        targetObjectiveId: '1.5',
+        expectedExample: 'celsius_to_fahrenheit(25) -> 77.0',
         breadcrumbs: {
-          level1Concept: 'Multiplication (*) and division (/) share equal precedence and bind left-to-right, while addition (+) has lower precedence. Parentheses explicitly group the thermal scaling factor before adding 32.',
-          level2Syntax: 'fahrenheit = (float(celsius_val) * 9 / 5) + 32',
-          level3Scaffold: 'def convert_temperature(celsius_val):\n    c = float(celsius_val)\n    # Compute scaled value then add constant 32\n    return (c * 9 / 5) + 32',
+          level1Concept: 'Multiplication (*) and division (/) run before addition (+). Using float(celsius) makes sure text like "25" or integers work cleanly.',
+          level2Syntax: 'fahrenheit = (float(celsius) * 9 / 5) + 32\nreturn fahrenheit',
+          level3Scaffold: 'def celsius_to_fahrenheit(celsius):\n    fahrenheit = (float(celsius) * 9 / 5) + 32\n    return fahrenheit',
         },
-        validationSnippet: 'assert abs(convert_temperature(25.0) - 77.0) < 0.001',
+        validationSnippet: 'assert abs(celsius_to_fahrenheit(25) - 77.0) < 0.001',
       },
       {
         stepNumber: 2,
-        title: 'Kinetic Energy with Exponentiation Operator (**)',
-        taskInstruction: 'Implement calculate_energy(mass_kg, velocity_ms) with 0.5 * mass * (velocity ** 2). Note that ** has higher precedence than *.',
-        targetObjectiveId: '1.5',
+        title: 'Step 2: Calculate Stops with // and %',
+        taskInstruction: 'Inside trip_fuel_stops(total_miles, miles_per_tank), set full_stops = total_miles // miles_per_tank and leftover_miles = total_miles % miles_per_tank.',
+        targetObjectiveId: '1.4',
+        expectedExample: 'trip_fuel_stops(650, 300) -> (2, 50)',
         breadcrumbs: {
-          level1Concept: 'Exponentiation (**) evaluates before multiplication (*). 0.5 * m * v ** 2 calculates v**2 first, then multiplies by 0.5 and m.',
-          level2Syntax: 'energy = 0.5 * float(mass_kg) * (float(velocity_ms) ** 2)',
-          level3Scaffold: 'def calculate_energy(mass_kg, velocity_ms):\n    # Apply 1/2 * m * v^2\n    return 0.5 * float(mass_kg) * (float(velocity_ms) ** 2)',
+          level1Concept: 'Floor division (//) gives how many whole times one number fits into another (650 // 300 == 2). Modulo (%) gives the remainder left over (650 % 300 == 50).',
+          level2Syntax: 'full_stops = int(total_miles) // int(miles_per_tank)\nleftover_miles = int(total_miles) % int(miles_per_tank)',
+          level3Scaffold: 'def trip_fuel_stops(total_miles, miles_per_tank):\n    full_stops = int(total_miles) // int(miles_per_tank)\n    leftover_miles = int(total_miles) % int(miles_per_tank)\n    return (full_stops, leftover_miles)',
         },
-        validationSnippet: 'assert calculate_energy(12.5, 4.0) == 100.0',
+        validationSnippet: 'assert trip_fuel_stops(650, 300) == (2, 50)',
       },
       {
         stepNumber: 3,
-        title: 'Formatted Console Output with sep and end Parameters',
-        taskInstruction: 'In run_conversion_suite(), test that print() displays the energy using sep=": " and end="\\n[Done]\\n".',
+        title: 'Step 3: Format Print Output with sep and end',
+        taskInstruction: 'In show_summary(), add sep=" | " and end="\\n[Done]\\n" to the print() statement so values are separated cleanly.',
         targetObjectiveId: '1.6',
+        expectedExample: 'Temp (F): | 77.0 | Stops: | 2 ... [Done]',
         breadcrumbs: {
-          level1Concept: 'The print() function takes keyword arguments: sep controls the delimiter string placed between multiple arguments (default is " "), and end controls the terminator string printed after all arguments (default is "\\n").',
-          level2Syntax: 'print("Kinetic Energy", ke, "Joules", sep=": ", end="\\n[Done]\\n")',
-          level3Scaffold: 'print("Kinetic Energy", ke, "Joules", sep="___", end="___")',
+          level1Concept: 'print() accepts sep= to choose what goes between items (default is a space) and end= to choose what goes at the very end (default is a newline).',
+          level2Syntax: 'print("Temp (F):", temp_f, "Stops:", stops, "Extra miles:", extra, sep=" | ", end="\\n[Done]\\n")',
+          level3Scaffold: 'def show_summary():\n    temp_f = celsius_to_fahrenheit(25)\n    stops, extra = trip_fuel_stops(650, 300)\n    print("Temp (F):", temp_f, "Stops:", stops, "Extra miles:", extra, sep=" | ", end="\\n[Done]\\n")',
         },
-        validationSnippet: 'run_conversion_suite()',
+        validationSnippet: 'assert celsius_to_fahrenheit(0) == 32.0 and trip_fuel_stops(100, 40) == (2, 20)',
       },
     ],
   },
   {
     id: 'proj-02-sentinel-loops',
-    title: 'Sensor Stream Sentinel & Walrus Analyzer',
+    title: 'Game Score Filter & Countdown Timer',
     sectionNumber: 2,
     sectionName: 'Control Flow — Conditional Blocks & Loops',
     examWeightPercentage: 23,
-    difficulty: 'Intermediate',
-    estimatedMinutes: 30,
-    specificObjectives: ['2.2', '2.3', '2.4', '2.6', '2.7'],
-    description: 'Process an IoT sensor telemetry stream using while loops with sentinel constants, the assignment expression (walrus operator :=), range() strides with negative steps, and loop jump controls (break and continue).',
+    difficulty: 'Beginner',
+    estimatedMinutes: 20,
+    specificObjectives: ['2.1', '2.3', '2.6', '2.7'],
+    fileName: 'score_tracker.py',
+    testFileName: 'test_score_tracker.py',
+    keyTip: 'break stops the entire loop immediately, while continue skips just the current item and jumps to the next loop turn.',
+    pitfallWarning: 'In range(start, stop, step), the stop number is NEVER included! To count down 5, 4, 3, 2, 1, stop must be 0: range(5, 0, -1).',
+    description: 'Practice Python loops and if/elif/else decisions by filtering game scores. Skip bad negative entries with continue, stop at the -1 quit signal with break, and count down with range().',
     learningOutcomes: [
-      'Control while loops with sentinel values like -999 or "QUIT"',
-      'Utilize the Python 3.8+ walrus operator (:=) inside conditional expressions',
-      'Generate inverted countdowns with range(start, stop, negative_step)',
-      'Filter anomaly spikes with continue and abort safely on critical alarms with break',
+      'Stop a loop early when hitting a sentinel value (-1) using break',
+      'Skip invalid items cleanly using continue',
+      'Count backwards using range(start, stop, -1)',
+      'Classify scores with if / elif / else branches',
     ],
-    starterCode: `# Sensor Stream Sentinel & Walrus Analyzer
-# PCEP-30-03 Section 02: Loops, Sentinels, Walrus & Control
+    starterCode: `# Lab 02: Game Score Filter & Countdown Timer (PCEP Domain 2)
+# Follow Step 1 -> Step 2 -> Step 3 in order from top to bottom!
 
-SENTINEL_SHUTDOWN = -999.0
-MAX_ALERT_TEMP = 85.0
-MIN_VALID_TEMP = -20.0
-
-def process_sensor_stream(telemetry_readings):
-    valid_readings = []
-    
-    # Step 1: Iterate through readings. Skip invalid readings with continue (< MIN_VALID_TEMP)
-    # If reading equals SENTINEL_SHUTDOWN, abort the loop with break.
-    for reading in telemetry_readings:
-        # TODO: Implement sentinel check and validation skip
+# STEP 1: Keep only valid scores until you hit the stop signal (-1)
+# - If score == -1: stop the loop (break)
+# - If score < 0: skip this score (continue)
+# - Otherwise: append score to valid_scores
+def filter_scores(scores):
+    valid_scores = []
+    for score in scores:
+        # TODO (Step 1): Add break, continue, and append logic
         pass
+    return valid_scores
 
-    return valid_readings
 
-def countdown_diagnostic(start_seconds):
-    # Step 2: Use range() with negative step to create countdown list [start, ..., 1]
-    # e.g., countdown_diagnostic(5) => [5, 4, 3, 2, 1]
-    countdown = []
-    # TODO: Fill using range(start, 0, -1)
-    return countdown
+# STEP 2: Count down from start_num to 1 using range() with a -1 step
+def launch_countdown(start_num):
+    # TODO (Step 2): Return a list like [5, 4, 3, 2, 1]
+    return []
 
-# Test driver
-sample_stream = [22.4, 23.1, -45.0, 31.0, 89.2, -999.0, 24.5]
-result = process_sensor_stream(sample_stream)
-print("Filtered telemetry:", result)
-print("Diagnostic countdown:", countdown_diagnostic(5))
+
+# STEP 3: Return "Gold" (90+), "Silver" (70-89), or "Bronze" (< 70)
+def get_medal(score):
+    # TODO (Step 3): Write an if / elif / else decision
+    return ""
+
+
+if __name__ == "__main__":
+    print("Valid scores:", filter_scores([85, -5, 92, -1, 100]))
+    print("Countdown:", launch_countdown(5))
+    print("Medal for 95:", get_medal(95))
 `,
-    solutionCode: `# Solution: Sensor Stream Sentinel & Walrus Analyzer
-SENTINEL_SHUTDOWN = -999.0
-MAX_ALERT_TEMP = 85.0
-MIN_VALID_TEMP = -20.0
+    solutionCode: `# Solution: Game Score Filter & Countdown Timer (PCEP Domain 2)
 
-def process_sensor_stream(telemetry_readings):
-    valid_readings = []
-    for reading in telemetry_readings:
-        if reading == SENTINEL_SHUTDOWN:
+def filter_scores(scores):
+    valid_scores = []
+    for score in scores:
+        if score == -1:
             break
-        if reading < MIN_VALID_TEMP:
+        if score < 0:
             continue
-        valid_readings.append(reading)
-    return valid_readings
+        valid_scores.append(score)
+    return valid_scores
 
-def countdown_diagnostic(start_seconds):
-    return list(range(start_seconds, 0, -1))
+def launch_countdown(start_num):
+    return list(range(start_num, 0, -1))
 
-sample_stream = [22.4, 23.1, -45.0, 31.0, 89.2, -999.0, 24.5]
-result = process_sensor_stream(sample_stream)
-print("Filtered telemetry:", result)
-print("Diagnostic countdown:", countdown_diagnostic(5))
+def get_medal(score):
+    if score >= 90:
+        return "Gold"
+    elif score >= 70:
+        return "Silver"
+    else:
+        return "Bronze"
+
+if __name__ == "__main__":
+    print("Valid scores:", filter_scores([85, -5, 92, -1, 100]))
+    print("Countdown:", launch_countdown(5))
+    print("Medal for 95:", get_medal(95))
 `,
     steps: [
       {
         stepNumber: 1,
-        title: 'Sentinel Check with break & Noise Filtering with continue',
-        taskInstruction: 'Iterate through telemetry_readings. If reading == SENTINEL_SHUTDOWN, break immediately. If reading < MIN_VALID_TEMP, skip using continue. Otherwise, append to valid_readings.',
+        title: 'Step 1: Skip Invalid Scores & Stop at -1',
+        taskInstruction: 'Inside filter_scores(scores), check if score == -1 and use break. Next, check if score < 0 and use continue. Otherwise call valid_scores.append(score).',
         targetObjectiveId: '2.7',
+        expectedExample: 'filter_scores([85, -5, 92, -1, 100]) -> [85, 92]',
         breadcrumbs: {
-          level1Concept: 'break terminates loop execution entirely, while continue skips the remainder of the current loop iteration and moves to the next sequence item.',
-          level2Syntax: 'if reading == SENTINEL_SHUTDOWN:\n    break\nif reading < MIN_VALID_TEMP:\n    continue',
-          level3Scaffold: 'for reading in telemetry_readings:\n    if reading == SENTINEL_SHUTDOWN:\n        break\n    if reading < MIN_VALID_TEMP:\n        continue\n    valid_readings.append(reading)',
+          level1Concept: 'Check for the stop signal (-1) first with break so it stops the loop immediately. Any other negative number is skipped with continue.',
+          level2Syntax: 'if score == -1:\n    break\nif score < 0:\n    continue\nvalid_scores.append(score)',
+          level3Scaffold: 'for score in scores:\n    if score == -1:\n        break\n    if score < 0:\n        continue\n    valid_scores.append(score)',
         },
-        validationSnippet: 'assert process_sensor_stream([20.0, -50.0, 25.0, -999.0, 30.0]) == [20.0, 25.0]',
+        validationSnippet: 'assert filter_scores([85, -5, 92, -1, 100]) == [85, 92]',
       },
       {
         stepNumber: 2,
-        title: 'Negative Step Stride with range()',
-        taskInstruction: 'Implement countdown_diagnostic(start_seconds) by calling range(start_seconds, 0, -1) and converting to a list.',
+        title: 'Step 2: Build a Countdown with range()',
+        taskInstruction: 'Inside launch_countdown(start_num), return list(range(start_num, 0, -1)).',
         targetObjectiveId: '2.6',
+        expectedExample: 'launch_countdown(5) -> [5, 4, 3, 2, 1]',
         breadcrumbs: {
-          level1Concept: 'range(start, stop, step) excludes the stop value. To count down from 5 to 1 inclusive, start is 5, stop is 0, and step is -1.',
-          level2Syntax: 'countdown = list(range(start_seconds, 0, -1))',
-          level3Scaffold: 'def countdown_diagnostic(start_seconds):\n    return list(range(start_seconds, 0, -1))',
+          level1Concept: 'range(start, stop, step) stops right before the stop number. Using stop=0 and step=-1 stops right after 1.',
+          level2Syntax: 'return list(range(start_num, 0, -1))',
+          level3Scaffold: 'def launch_countdown(start_num):\n    return list(range(start_num, 0, -1))',
         },
-        validationSnippet: 'assert countdown_diagnostic(5) == [5, 4, 3, 2, 1]',
+        validationSnippet: 'assert launch_countdown(5) == [5, 4, 3, 2, 1]',
+      },
+      {
+        stepNumber: 3,
+        title: 'Step 3: Award Medals with if / elif / else',
+        taskInstruction: 'Inside get_medal(score), return "Gold" if score >= 90, "Silver" if score >= 70, and "Bronze" otherwise.',
+        targetObjectiveId: '2.1',
+        expectedExample: 'get_medal(95) -> "Gold", get_medal(75) -> "Silver"',
+        breadcrumbs: {
+          level1Concept: 'if/elif/else checks conditions from top to bottom and runs the first branch that is True.',
+          level2Syntax: 'if score >= 90:\n    return "Gold"\nelif score >= 70:\n    return "Silver"\nelse:\n    return "Bronze"',
+          level3Scaffold: 'def get_medal(score):\n    if score >= 90:\n        return "Gold"\n    elif score >= 70:\n        return "Silver"\n    else:\n        return "Bronze"',
+        },
+        validationSnippet: 'assert get_medal(95) == "Gold" and get_medal(75) == "Silver" and get_medal(50) == "Bronze"',
       },
     ],
   },
   {
     id: 'proj-03-caesar-cipher',
-    title: 'Interactive CLI Caesar Cipher',
+    title: 'Secret Message Scrambler (Caesar Cipher)',
     sectionNumber: 3,
     sectionName: 'Data Collections — Lists, Tuples, Sets, Dicts & Strings',
     examWeightPercentage: 26,
-    difficulty: 'Intermediate',
-    estimatedMinutes: 35,
+    difficulty: 'Beginner',
+    estimatedMinutes: 20,
     specificObjectives: ['3.1', '3.2', '3.8', '3.9'],
-    description: 'Construct a terminal cryptographic cipher applying ord(), chr(), modulo 26 shift arithmetic, and string immutability best practices.',
+    fileName: 'secret_scrambler.py',
+    testFileName: 'test_secret_scrambler.py',
+    keyTip: 'ord("A") turns a letter into its number (65), and chr(65) turns a number back into "A". Modulo (% 26) wraps Z back around to A!',
+    pitfallWarning: 'Strings cannot be changed in place in Python (text[0] = "X" causes a TypeError). Always collect letters in a list and combine them at the end with "".join(letters).',
+    description: 'Build a secret-message scrambler that shifts letters forward or backward through the alphabet while keeping spaces, numbers, and punctuation untouched.',
     learningOutcomes: [
-      'Perform character-level ASCII mapping with ord() and chr()',
-      'Compute cyclic alphabetic wrapping via (ord(c) - base + shift) % 26 + base',
-      'Preserve string immutability by accumulating chars into a list and calling "".join()',
-      'Handle uppercase (base 65) and lowercase (base 97) letters while keeping whitespace and symbols untouched',
+      'Convert letters to numbers and back with ord() and chr()',
+      'Wrap around the 26-letter alphabet using modulo (% 26)',
+      'Build new strings safely using a list and "".join()',
+      'Keep spaces and punctuation unchanged in an else branch',
     ],
-    starterCode: `"""
-PCEP-30-03 Domain 3 Lab: Caesar Cipher CLI Engine
-Demonstrating ord(), chr(), modulo 26 shifts, and string immutability.
-"""
+    starterCode: `# Lab 03: Secret Message Scrambler (PCEP Domain 3)
+# Follow Step 1 -> Step 2 -> Step 3 in order from top to bottom!
 
-def caesar_cipher(plaintext: str, shift: int) -> str:
-    # Accumulated character list to adhere to string immutability
-    transformed_chars = []
+def caesar_cipher(text, shift):
+    result = []
 
-    for char in plaintext:
+    for char in text:
+        # STEP 1: Shift uppercase letters ('A' to 'Z')
         if char.isupper():
-            base = ord('A')  # 65
-            # Shift uppercase character
-            new_char = chr((ord(char) - base + shift) % 26 + base)
-            transformed_chars.append(new_char)
-        elif char.islower():
-            base = ord('a')  # 97
-            # Shift lowercase character
-            new_char = chr((ord(char) - base + shift) % 26 + base)
-            transformed_chars.append(new_char)
-        else:
-            # Preserves punctuation, whitespace, and numerical digits untouched
-            transformed_chars.append(char)
+            base = ord("A")
+            # TODO (Step 1): Replace char with shifted uppercase letter
+            new_char = char
+            result.append(new_char)
 
-    return "".join(transformed_chars)
+        # STEP 2: Shift lowercase letters ('a' to 'z') and keep symbols as-is
+        elif char.islower():
+            base = ord("a")
+            # TODO (Step 2): Replace char with shifted lowercase letter
+            new_char = char
+            result.append(new_char)
+        else:
+            # Keep spaces, numbers, and punctuation unchanged
+            result.append(char)
+
+    # STEP 3: Join all characters into one string and return it
+    # TODO (Step 3): Return "".join(result)
+    return ""
+
 
 if __name__ == "__main__":
-    sample_text = "Python Institute 2025!"
-    k = 4
-    encoded = caesar_cipher(sample_text, k)
-    print(f"Ciphertext: {encoded}")
+    print("Encoded:", caesar_cipher("PYTHON", 3))
+    print("Decoded:", caesar_cipher("MZBM", -3))
 `,
-    solutionCode: `"""
-PCEP-30-03 Domain 3 Lab: Caesar Cipher CLI Engine
-Demonstrating ord(), chr(), modulo 26 shifts, and string immutability.
-"""
+    solutionCode: `# Solution: Secret Message Scrambler (PCEP Domain 3)
 
-def caesar_cipher(plaintext: str, shift: int) -> str:
-    transformed_chars = []
-    for char in plaintext:
+def caesar_cipher(text, shift):
+    result = []
+    for char in text:
         if char.isupper():
-            base = ord('A')
+            base = ord("A")
             new_char = chr((ord(char) - base + shift) % 26 + base)
-            transformed_chars.append(new_char)
+            result.append(new_char)
         elif char.islower():
-            base = ord('a')
+            base = ord("a")
             new_char = chr((ord(char) - base + shift) % 26 + base)
-            transformed_chars.append(new_char)
+            result.append(new_char)
         else:
-            transformed_chars.append(char)
-    return "".join(transformed_chars)
+            result.append(char)
+    return "".join(result)
 
 if __name__ == "__main__":
-    sample_text = "Python Institute 2025!"
-    k = 4
-    encoded = caesar_cipher(sample_text, k)
-    print(f"Ciphertext: {encoded}")
+    print("Encoded:", caesar_cipher("PYTHON", 3))
+    print("Decoded:", caesar_cipher("MZBM", -3))
 `,
     steps: [
       {
         stepNumber: 1,
-        title: 'ASCII Normalization and Uppercase Shifting',
-        taskInstruction: 'Implement uppercase shift using base = ord("A") (65) and formula chr((ord(char) - base + shift) % 26 + base).',
+        title: 'Step 1: Shift Uppercase Letters',
+        taskInstruction: 'Under if char.isupper():, compute new_char = chr((ord(char) - base + shift) % 26 + base) so uppercase letters wrap cleanly from Z to A.',
         targetObjectiveId: '3.8',
+        expectedExample: 'caesar_cipher("PYTHON", 3) -> "SBWKRQ"',
         breadcrumbs: {
-          level1Concept: 'Characters in Python cannot be mutated in place. ord("A") gives 65; subtracting 65 yields 0-25 relative index, modulo 26 wraps cyclically, and chr() converts back.',
-          level2Syntax: 'new_char = chr((ord(char) - 65 + shift) % 26 + 65)',
-          level3Scaffold: 'if char.isupper():\\n    base = ord("A")\\n    transformed_chars.append(chr((ord(char) - base + shift) % 26 + base))',
+          level1Concept: 'Subtracting base (65 for "A") turns A..Z into 0..25. Adding shift and taking % 26 wraps past 25 back to 0, and adding base brings it back to A..Z.',
+          level2Syntax: 'new_char = chr((ord(char) - base + shift) % 26 + base)',
+          level3Scaffold: 'if char.isupper():\n    base = ord("A")\n    new_char = chr((ord(char) - base + shift) % 26 + base)\n    result.append(new_char)',
         },
         validationSnippet: 'assert caesar_cipher("PYTHON", 3) == "SBWKRQ"',
       },
       {
         stepNumber: 2,
-        title: 'Lowercase Shifting & Whitespace/Punctuation Invariance',
-        taskInstruction: 'Handle lowercase characters (base = 97) and preserve punctuation, spaces, and digits untouched in the else block.',
+        title: 'Step 2: Shift Lowercase Letters & Keep Symbols',
+        taskInstruction: 'Under elif char.islower():, use the same formula with base = ord("a") (97). Punctuation and spaces stay unchanged in the else block.',
         targetObjectiveId: '3.9',
+        expectedExample: 'caesar_cipher("Hello, World!", 5) -> "Mjqqt, Btwqi!"',
         breadcrumbs: {
-          level1Concept: 'islower() checks if a character is lowercase. Non-alphabetic characters should be appended directly without modification.',
-          level2Syntax: 'elif char.islower():\\n    base = ord("a")\\n    transformed_chars.append(chr((ord(char) - base + shift) % 26 + base))\\nelse:\\n    transformed_chars.append(char)',
-          level3Scaffold: 'elif char.islower():\\n    base = ord("a")\\n    transformed_chars.append(chr((ord(char) - base + shift) % 26 + base))\\nelse:\\n    transformed_chars.append(char)',
+          level1Concept: 'Lowercase letters start at ord("a") = 97. Using base = ord("a") ensures "x", "y", "z" wrap back to "a", "b", "c".',
+          level2Syntax: 'elif char.islower():\n    base = ord("a")\n    new_char = chr((ord(char) - base + shift) % 26 + base)\n    result.append(new_char)',
+          level3Scaffold: 'elif char.islower():\n    base = ord("a")\n    new_char = chr((ord(char) - base + shift) % 26 + base)\n    result.append(new_char)',
         },
         validationSnippet: 'assert caesar_cipher("Hello, World!", 5) == "Mjqqt, Btwqi!"',
       },
       {
         stepNumber: 3,
-        title: 'Negative Shift Decryption and Boundary Wraparound',
-        taskInstruction: 'Verify that negative shift values (e.g., -3 for decrypting) wrap properly around the alphabet using Python\'s modulo operator.',
+        title: 'Step 3: Join List & Verify Negative Shift Decoding',
+        taskInstruction: 'At the bottom of caesar_cipher, return "".join(result). Python handles negative shifts like -3 automatically with % 26.',
         targetObjectiveId: '3.1',
+        expectedExample: 'caesar_cipher("PCEP", -3) -> "MZBM"',
         breadcrumbs: {
-          level1Concept: 'Python modulo (%) on negative integers preserves mathematical congruence: (-3) % 26 equals 23, correctly shifting backwards.',
-          level2Syntax: 'caesar_cipher("PCEP", -3)',
-          level3Scaffold: 'assert caesar_cipher("xyz", 3) == "abc"\\nassert caesar_cipher("PCEP", -3) == "MZBM"',
+          level1Concept: '"".join(result) combines every letter in the list into one string. In Python, (-3) % 26 is 23, so negative shifts decode backwards automatically.',
+          level2Syntax: 'return "".join(result)',
+          level3Scaffold: 'return "".join(result)',
         },
         validationSnippet: 'assert caesar_cipher("PCEP", -3) == "MZBM"',
       },
@@ -412,334 +440,379 @@ if __name__ == "__main__":
   },
   {
     id: 'proj-03-collections-strings',
-    title: 'Inventory Hash Table & String Normalizer',
+    title: 'School Store Cart & Receipt Formatter',
     sectionNumber: 3,
     sectionName: 'Data Collections — Lists, Tuples, Sets, Dicts & Strings',
     examWeightPercentage: 26,
-    difficulty: 'Intermediate',
-    estimatedMinutes: 35,
+    difficulty: 'Beginner',
+    estimatedMinutes: 20,
     specificObjectives: ['3.1', '3.4', '3.5', '3.6', '3.9'],
-    description: 'Construct a warehouse inventory tracking engine utilizing dictionary lookups, unique category sets, immutable SKU tuples, list slicing, and string transformations with f-strings.',
+    fileName: 'school_store.py',
+    testFileName: 'test_school_store.py',
+    keyTip: 'Use a set() whenever you want zero duplicates, dict.get(key) to look up items safely, and :.2f inside an f-string for dollars and cents.',
+    pitfallWarning: 'Empty curly braces {} create a dictionary, NOT a set! Always use set() when starting an empty set.',
+    description: 'Organize a school store catalog using Python dictionaries, sets, list slicing, and f-strings to print clean, formatted price labels.',
     learningOutcomes: [
-      'Extract sub-arrays with list slicing [start:stop:step] and avoid mutating originals',
-      'Enforce record integrity using immutable tuples (sku, serial)',
-      'Deduplicate category tags with set operations (add, set())',
-      'Safely query and mutate dictionary keys using dict.get() and dict.items()',
-      'Format currency and string reports using Python 3 f-strings with precision specifiers',
+      'Remove duplicate category tags using a set',
+      'Look up dictionary values safely with .get()',
+      'Format uppercase names and 2-decimal prices with f-strings',
+      'Take the first N items from a list using [:count]',
     ],
-    starterCode: `# Inventory Hash Table & String Normalizer
-# PCEP-30-03 Section 03: Lists, Tuples, Sets, Dicts & Strings
+    starterCode: `# Lab 04: School Store Cart & Receipt Formatter (PCEP Domain 3)
+# Follow Step 1 -> Step 2 -> Step 3 in order from top to bottom!
 
-# Master catalog: sku -> {name, price, categories}
 catalog = {
-    "SKU-101": {"name": "mechanical keyboard", "price": 129.99, "tags": ["hardware", "usb", "peripherals"]},
-    "SKU-102": {"name": "ultra-wide monitor", "price": 499.50, "tags": ["hardware", "display", "peripherals"]},
-    "SKU-103": {"name": "ergonomic mouse", "price": 79.95, "tags": ["hardware", "usb"]},
+    "ITEM-1": {"name": "graphing calculator", "price": 89.99, "tags": ["math", "tech", "school"]},
+    "ITEM-2": {"name": "spiral notebook", "price": 4.50, "tags": ["writing", "school"]},
+    "ITEM-3": {"name": "usb flash drive", "price": 14.25, "tags": ["tech", "school"]},
 }
 
-def get_unique_categories(inventory):
-    # Step 1: Collect unique tags across all items using a set
+# STEP 1: Collect every unique tag across all catalog items into a set
+def get_unique_categories(store_catalog):
     categories = set()
-    # TODO: Loop through inventory.values() and add tags to set
+    # TODO (Step 1): Loop over store_catalog.values() and add each tag to categories
     return categories
 
-def format_price_report(sku, inventory):
-    # Step 2: Use f-string to format output: "[SKU-101] MECHANICAL KEYBOARD: $129.99"
-    # Title/Upper case the name and format price to 2 decimal places (.2f)
-    item = inventory.get(sku)
+
+# STEP 2: Return a formatted label like "[ITEM-1] GRAPHING CALCULATOR: $89.99"
+def format_price_label(code, store_catalog):
+    item = store_catalog.get(code)
     if not item:
         return "Not found"
-    # TODO: Return formatted f-string
+    # TODO (Step 2): Uppercase item["name"] and format item["price"] with :.2f
     return ""
 
-def slice_top_items(skus_list, count):
-    # Step 3: Return a slice of the first 'count' elements using [:count]
+
+# STEP 3: Return the first 'count' item codes using list slicing
+def get_top_items(item_codes, count):
+    # TODO (Step 3): Return item_codes[:count]
     return []
 
-# Test driver
-print("Categories:", get_unique_categories(catalog))
-print(format_price_report("SKU-101", catalog))
+
+if __name__ == "__main__":
+    print("Categories:", get_unique_categories(catalog))
+    print(format_price_label("ITEM-1", catalog))
+    print("Top 2:", get_top_items(["ITEM-1", "ITEM-2", "ITEM-3"], 2))
 `,
-    solutionCode: `# Solution: Inventory Hash Table & String Normalizer
+    solutionCode: `# Solution: School Store Cart & Receipt Formatter (PCEP Domain 3)
+
 catalog = {
-    "SKU-101": {"name": "mechanical keyboard", "price": 129.99, "tags": ["hardware", "usb", "peripherals"]},
-    "SKU-102": {"name": "ultra-wide monitor", "price": 499.50, "tags": ["hardware", "display", "peripherals"]},
-    "SKU-103": {"name": "ergonomic mouse", "price": 79.95, "tags": ["hardware", "usb"]},
+    "ITEM-1": {"name": "graphing calculator", "price": 89.99, "tags": ["math", "tech", "school"]},
+    "ITEM-2": {"name": "spiral notebook", "price": 4.50, "tags": ["writing", "school"]},
+    "ITEM-3": {"name": "usb flash drive", "price": 14.25, "tags": ["tech", "school"]},
 }
 
-def get_unique_categories(inventory):
+def get_unique_categories(store_catalog):
     categories = set()
-    for item in inventory.values():
+    for item in store_catalog.values():
         for tag in item.get("tags", []):
             categories.add(tag)
     return categories
 
-def format_price_report(sku, inventory):
-    item = inventory.get(sku)
+def format_price_label(code, store_catalog):
+    item = store_catalog.get(code)
     if not item:
         return "Not found"
     clean_name = item["name"].upper()
     price = item["price"]
-    return f"[{sku}] {clean_name}: $" + f"{price:.2f}"
+    return f"[{code}] {clean_name}: $" + f"{price:.2f}"
 
-def slice_top_items(skus_list, count):
-    return skus_list[:count]
+def get_top_items(item_codes, count):
+    return item_codes[:count]
 
-print("Categories:", get_unique_categories(catalog))
-print(format_price_report("SKU-101", catalog))
-print("Top 2 items:", slice_top_items(["SKU-101", "SKU-102", "SKU-103"], 2))
+if __name__ == "__main__":
+    print("Categories:", get_unique_categories(catalog))
+    print(format_price_label("ITEM-1", catalog))
+    print("Top 2:", get_top_items(["ITEM-1", "ITEM-2", "ITEM-3"], 2))
 `,
     steps: [
       {
         stepNumber: 1,
-        title: 'Deduplicating Tags with Sets',
-        taskInstruction: 'Iterate over inventory.values(), access item["tags"], and add each tag to a set via categories.add(tag) to guarantee uniqueness.',
+        title: 'Step 1: Collect Unique Tags with a set',
+        taskInstruction: 'Inside get_unique_categories(store_catalog), loop through store_catalog.values(), then loop through item["tags"] and call categories.add(tag).',
         targetObjectiveId: '3.5',
+        expectedExample: '"tech" in get_unique_categories(catalog) -> True',
         breadcrumbs: {
-          level1Concept: 'Sets store only unique, hashable elements. Adding an existing item to a set is an idempotent operation with O(1) average lookup time.',
-          level2Syntax: 'for item in inventory.values():\n    for tag in item.get("tags", []):\n        categories.add(tag)',
-          level3Scaffold: 'for item in inventory.values():\n    # Iterate through tags list and add to set\n    for t in item.get("tags", []):\n        categories.add(t)',
+          level1Concept: 'A set automatically ignores duplicates. Calling categories.add("school") twice only stores "school" once.',
+          level2Syntax: 'for item in store_catalog.values():\n    for tag in item.get("tags", []):\n        categories.add(tag)',
+          level3Scaffold: 'for item in store_catalog.values():\n    for tag in item.get("tags", []):\n        categories.add(tag)',
         },
-        validationSnippet: 'assert "peripherals" in get_unique_categories(catalog)',
+        validationSnippet: 'assert "school" in get_unique_categories(catalog) and len(get_unique_categories(catalog)) == 4',
       },
       {
         stepNumber: 2,
-        title: 'String Method .upper() and f-string Precision Formatting',
-        taskInstruction: 'Implement format_price_report(sku, inventory) returning f"[{sku}] {clean_name}: $" + f"{price:.2f}" where clean_name is item["name"].upper().',
+        title: 'Step 2: Format Price Labels with .upper() & :.2f',
+        taskInstruction: 'Inside format_price_label(code, store_catalog), get clean_name = item["name"].upper() and price = item["price"], then return f"[{code}] {clean_name}: $" + f"{price:.2f}".',
         targetObjectiveId: '3.9',
+        expectedExample: '"[ITEM-1] GRAPHING CALCULATOR: $89.99"',
         breadcrumbs: {
-          level1Concept: 'f-strings support expression evaluation within curly braces {}. The :.2f format specifier forces floating-point values to render exactly two decimal places.',
-          level2Syntax: 'return f"[{sku}] {item[\'name\'].upper()}: $" + f"{item[\'price\']:.2f}"',
-          level3Scaffold: 'name_upper = item["name"].upper()\nprice = item["price"]\nreturn f"[{sku}] {name_upper}: $" + f"{price:.2f}"',
+          level1Concept: '.upper() converts text to ALL CAPS, and :.2f inside an f-string guarantees two decimal places (like $4.50 instead of $4.5).',
+          level2Syntax: 'clean_name = item["name"].upper()\nprice = item["price"]\nreturn f"[{code}] {clean_name}: $" + f"{price:.2f}"',
+          level3Scaffold: 'clean_name = item["name"].upper()\nprice = item["price"]\nreturn f"[{code}] {clean_name}: $" + f"{price:.2f}"',
         },
-        validationSnippet: 'assert format_price_report("SKU-101", catalog) == "[SKU-101] MECHANICAL KEYBOARD: $129.99"',
+        validationSnippet: 'assert format_price_label("ITEM-1", catalog) == "[ITEM-1] GRAPHING CALCULATOR: $89.99"',
       },
       {
         stepNumber: 3,
-        title: 'List Slicing Sytnax',
-        taskInstruction: 'Implement slice_top_items(skus_list, count) using Python slice notation [:count].',
+        title: 'Step 3: Slice Top Items with [:count]',
+        taskInstruction: 'Inside get_top_items(item_codes, count), return item_codes[:count].',
         targetObjectiveId: '3.1',
+        expectedExample: 'get_top_items(["A", "B", "C"], 2) -> ["A", "B"]',
         breadcrumbs: {
-          level1Concept: 'Slicing skus[:count] returns a new shallow copy of elements from index 0 up to, but not including, index count.',
-          level2Syntax: 'return skus_list[:count]',
-          level3Scaffold: 'def slice_top_items(skus_list, count):\n    return skus_list[:count]',
+          level1Concept: 'Slicing with [:count] starts at index 0 and stops right before index count, without changing the original list.',
+          level2Syntax: 'return item_codes[:count]',
+          level3Scaffold: 'def get_top_items(item_codes, count):\n    return item_codes[:count]',
         },
-        validationSnippet: 'assert slice_top_items(["A", "B", "C"], 2) == ["A", "B"]',
+        validationSnippet: 'assert get_top_items(["ITEM-1", "ITEM-2", "ITEM-3"], 2) == ["ITEM-1", "ITEM-2"]',
       },
     ],
   },
   {
     id: 'proj-04-functions-exceptions',
-    title: 'Safe Financial Math Pipeline & Exception Sentinel',
+    title: 'Safe Quiz Average & Division Guard',
     sectionNumber: 4,
     sectionName: 'Functions & Exceptions',
     examWeightPercentage: 20,
     difficulty: 'Intermediate',
-    estimatedMinutes: 30,
-    specificObjectives: ['4.1', '4.3', '4.4', '4.5', '4.6', '4.7'],
-    description: 'Construct a bulletproof financial computation pipeline handling variable arguments (*args), positional vs keyword arguments, namespace scoping, and defensive try-except blocks for ZeroDivisionError and ValueError.',
+    estimatedMinutes: 20,
+    specificObjectives: ['4.1', '4.2', '4.3', '4.4', '4.6', '4.7'],
+    fileName: 'safe_grader.py',
+    testFileName: 'test_safe_grader.py',
+    keyTip: '*scores packs any number of arguments into a tuple, and try...except lets your program handle errors gracefully instead of crashing.',
+    pitfallWarning: 'Always put specific exceptions (like ZeroDivisionError) BEFORE general ones (like Exception), otherwise the specific handler is never reached!',
+    description: 'Write flexible Python functions using *args and default bonus points, then add try-except blocks to catch division by zero and bad text inputs safely.',
     learningOutcomes: [
-      'Aggregate multiple values with variable argument packing (*args)',
-      'Distinguish positional arguments from keyword arguments with default values',
-      'Manage variable namespaces and prevent accidental global mutability',
-      'Catch specific exceptions (ZeroDivisionError, ValueError) without masking bugs',
-      'Execute cleanup logic using the finally block',
+      'Accept any number of arguments using *args',
+      'Set default parameter values like bonus=0',
+      'Catch ZeroDivisionError separately from ValueError and TypeError',
+      'Return clear messages instead of letting errors crash your program',
     ],
-    starterCode: `# Safe Financial Math Pipeline & Exception Sentinel
-# PCEP-30-03 Section 04: Functions & Exception Handling
+    starterCode: `# Lab 05: Safe Quiz Average & Division Guard (PCEP Domain 4)
+# Follow Step 1 -> Step 2 -> Step 3 in order from top to bottom!
 
-TRANSACTION_FEE_RATE = 0.02 # 2% global fee
+# STEP 1: Compute the average of any number of scores, plus an optional bonus
+def average_score(*scores, bonus=0):
+    if not scores:
+        return 0.0
+    # TODO (Step 1): Compute (sum(scores) / len(scores)) + bonus, rounded to 2 decimals
+    return 0.0
 
-def calculate_portfolio_total(*values, fee_rate=TRANSACTION_FEE_RATE):
-    # Step 1: Sum all *values (tuple) and apply fee: total * (1 - fee_rate)
-    # Default argument fee_rate should be respected if not passed
-    total = sum(values)
-    net_total = total * (1.0 - fee_rate)
-    return round(net_total, 2)
 
-def safe_ratio_calculator(numerator, denominator):
-    # Step 2: Implement try-except handling:
-    # - Return float(numerator) / float(denominator)
-    # - Catch ZeroDivisionError: return "ERROR: ZeroDivision"
-    # - Catch (ValueError, TypeError): return "ERROR: InvalidType"
-    # - Catch generic Exception: return "ERROR: Unknown"
-    # TODO: Implement try-except block
+# STEP 2 & STEP 3: Safely divide two numbers without crashing
+# - Valid numbers: return float(a) / float(b)
+# - Dividing by 0 (ZeroDivisionError): return "Cannot divide by zero"
+# - Non-numbers (ValueError, TypeError): return "Please enter numbers only"
+def safe_divide(a, b):
+    # TODO (Step 2 & 3): Wrap float(a) / float(b) in try / except blocks
     return None
 
-# Test driver
-print("Portfolio Net:", calculate_portfolio_total(100.0, 250.0, 50.0))
-print("Ratio 100/4:", safe_ratio_calculator(100, 4))
-print("Ratio 100/0:", safe_ratio_calculator(100, 0))
-print("Ratio 100/'abc':", safe_ratio_calculator(100, "abc"))
+
+if __name__ == "__main__":
+    print("Average with bonus:", average_score(80, 90, 100, bonus=2))
+    print("10 / 2 =", safe_divide(10, 2))
+    print("10 / 0 =", safe_divide(10, 0))
+    print("10 / abc =", safe_divide(10, "abc"))
 `,
-    solutionCode: `# Solution: Safe Financial Math Pipeline & Exception Sentinel
-TRANSACTION_FEE_RATE = 0.02
+    solutionCode: `# Solution: Safe Quiz Average & Division Guard (PCEP Domain 4)
 
-def calculate_portfolio_total(*values, fee_rate=TRANSACTION_FEE_RATE):
-    total = sum(values)
-    net_total = total * (1.0 - fee_rate)
-    return round(net_total, 2)
+def average_score(*scores, bonus=0):
+    if not scores:
+        return 0.0
+    avg = (sum(scores) / len(scores)) + bonus
+    return round(avg, 2)
 
-def safe_ratio_calculator(numerator, denominator):
+def safe_divide(a, b):
     try:
-        n = float(numerator)
-        d = float(denominator)
-        return n / d
+        return float(a) / float(b)
     except ZeroDivisionError:
-        return "ERROR: ZeroDivision"
+        return "Cannot divide by zero"
     except (ValueError, TypeError):
-        return "ERROR: InvalidType"
-    except Exception:
-        return "ERROR: Unknown"
+        return "Please enter numbers only"
 
-print("Portfolio Net:", calculate_portfolio_total(100.0, 250.0, 50.0))
-print("Ratio 100/4:", safe_ratio_calculator(100, 4))
-print("Ratio 100/0:", safe_ratio_calculator(100, 0))
-print("Ratio 100/'abc':", safe_ratio_calculator(100, "abc"))
+if __name__ == "__main__":
+    print("Average with bonus:", average_score(80, 90, 100, bonus=2))
+    print("10 / 2 =", safe_divide(10, 2))
+    print("10 / 0 =", safe_divide(10, 0))
+    print("10 / abc =", safe_divide(10, "abc"))
 `,
     steps: [
       {
         stepNumber: 1,
-        title: 'Variable Arguments (*args) and Keyword Defaults',
-        taskInstruction: 'Implement calculate_portfolio_total(*values, fee_rate=TRANSACTION_FEE_RATE). Pack values into a tuple, compute total net of fee, and return rounded to 2 decimal places.',
+        title: 'Step 1: Flexible Average with *scores & bonus=0',
+        taskInstruction: 'Inside average_score(*scores, bonus=0), compute avg = (sum(scores) / len(scores)) + bonus and return round(avg, 2).',
         targetObjectiveId: '4.4',
+        expectedExample: 'average_score(80, 90, 100, bonus=2) -> 92.0',
         breadcrumbs: {
-          level1Concept: '*values collects any number of positional arguments into an immutable tuple. Keyword arguments following *args can only be passed by keyword name.',
-          level2Syntax: 'def calculate_portfolio_total(*values, fee_rate=0.02):\n    return round(sum(values) * (1 - fee_rate), 2)',
-          level3Scaffold: 'def calculate_portfolio_total(*values, fee_rate=TRANSACTION_FEE_RATE):\n    gross = sum(values)\n    return round(gross * (1.0 - fee_rate), 2)',
+          level1Concept: '*scores collects all positional numbers into a tuple so sum(scores) and len(scores) work for 1 score or 10 scores. bonus=0 is a default keyword argument.',
+          level2Syntax: 'avg = (sum(scores) / len(scores)) + bonus\nreturn round(avg, 2)',
+          level3Scaffold: 'def average_score(*scores, bonus=0):\n    if not scores:\n        return 0.0\n    return round((sum(scores) / len(scores)) + bonus, 2)',
         },
-        validationSnippet: 'assert calculate_portfolio_total(100.0, 200.0) == 294.0',
+        validationSnippet: 'assert average_score(80, 90, 100, bonus=2) == 92.0',
       },
       {
         stepNumber: 2,
-        title: 'Targeted Exception Handling Hierarchy',
-        taskInstruction: 'In safe_ratio_calculator(), wrap float conversions and division in a try block. Catch ZeroDivisionError specifically, followed by (ValueError, TypeError), returning designated error strings.',
-        targetObjectiveId: '4.7',
+        title: 'Step 2: Catch ZeroDivisionError in safe_divide()',
+        taskInstruction: 'Inside safe_divide(a, b), add a try: block returning float(a) / float(b) and an except ZeroDivisionError: block returning "Cannot divide by zero".',
+        targetObjectiveId: '4.6',
+        expectedExample: 'safe_divide(10, 0) -> "Cannot divide by zero"',
         breadcrumbs: {
-          level1Concept: 'Python evaluates except blocks top-to-bottom. Specific exceptions (ZeroDivisionError) must be caught before more general ones (Exception). Tuples group multiple exception types in a single except clause.',
-          level2Syntax: 'try:\n    return float(num) / float(den)\nexcept ZeroDivisionError:\n    return "ERROR: ZeroDivision"\nexcept (ValueError, TypeError):\n    return "ERROR: InvalidType"',
-          level3Scaffold: 'try:\n    return float(numerator) / float(denominator)\nexcept ZeroDivisionError:\n    return "ERROR: ZeroDivision"\nexcept (ValueError, TypeError):\n    return "ERROR: InvalidType"',
+          level1Concept: 'Put the risky division inside try:. If b is 0, Python jumps straight to except ZeroDivisionError: instead of crashing.',
+          level2Syntax: 'try:\n    return float(a) / float(b)\nexcept ZeroDivisionError:\n    return "Cannot divide by zero"',
+          level3Scaffold: 'try:\n    return float(a) / float(b)\nexcept ZeroDivisionError:\n    return "Cannot divide by zero"',
         },
-        validationSnippet: 'assert safe_ratio_calculator(10, 0) == "ERROR: ZeroDivision"',
+        validationSnippet: 'assert safe_divide(10, 0) == "Cannot divide by zero" and safe_divide(10, 2) == 5.0',
+      },
+      {
+        stepNumber: 3,
+        title: 'Step 3: Catch ValueError & TypeError',
+        taskInstruction: 'Add except (ValueError, TypeError): below ZeroDivisionError and return "Please enter numbers only".',
+        targetObjectiveId: '4.7',
+        expectedExample: 'safe_divide(10, "abc") -> "Please enter numbers only"',
+        breadcrumbs: {
+          level1Concept: 'float("abc") raises ValueError, and float(None) raises TypeError. Putting both in parentheses catches either mistake cleanly.',
+          level2Syntax: 'except (ValueError, TypeError):\n    return "Please enter numbers only"',
+          level3Scaffold: 'try:\n    return float(a) / float(b)\nexcept ZeroDivisionError:\n    return "Cannot divide by zero"\nexcept (ValueError, TypeError):\n    return "Please enter numbers only"',
+        },
+        validationSnippet: 'assert safe_divide(10, "abc") == "Please enter numbers only"',
       },
     ],
   },
   {
     id: 'proj-05-files-modules',
-    title: 'CSV Gradebook Audit & Standard Math Analyzer',
+    title: 'Class Gradebook & Raffle Winner Picker',
     sectionNumber: 5,
     sectionName: 'File Handling & Module Imports',
     examWeightPercentage: 14,
-    difficulty: 'Advanced',
-    estimatedMinutes: 30,
+    difficulty: 'Intermediate',
+    estimatedMinutes: 20,
     specificObjectives: ['5.2', '5.3', '5.4', '5.5'],
-    description: 'Process a simulated student academic gradebook using context-managed CSV parsing (with open as), standard math functions (ceil, floor, trunc), and random module sampling for statistical diagnostics.',
+    fileName: 'gradebook_raffle.py',
+    testFileName: 'test_gradebook_raffle.py',
+    keyTip: 'math.ceil() always rounds UP to the next integer, math.floor() always rounds DOWN, and random.seed() makes random picks repeatable for tests.',
+    pitfallWarning: 'Watch out for negative numbers on the PCEP exam: math.floor(-3.2) is -4 (down), while math.trunc(-3.2) is -3 (chops off decimals).',
+    description: 'Read comma-separated (CSV) student quiz scores, summarize class highs and lows with the math module, and pick a raffle winner using the random module.',
     learningOutcomes: [
-      'Employ the with statement context manager to prevent resource leaks',
-      'Parse delimited CSV records and calculate composite scores',
-      'Distinguish math.floor() from math.trunc() for negative real numbers',
-      'Utilize random.choice() and random.sample() without modifying source datasets',
+      'Split CSV text lines into names and numeric scores',
+      'Use math.ceil() and math.floor() from the standard math module',
+      'Use random.seed() and random.choice() from the random module',
+      'Return structured tuples and dictionaries',
     ],
-    starterCode: `# CSV Gradebook Audit & Standard Math Analyzer
-# PCEP-30-03 Section 05: Files, Context Managers & Standard Library
+    starterCode: `# Lab 06: Class Gradebook & Raffle Winner Picker (PCEP Domain 5)
+# Follow Step 1 -> Step 2 -> Step 3 in order from top to bottom!
 
 import math
 import random
 
-# Simulated in-memory CSV file data: Name, Score1, Score2
-csv_raw_records = """Alice,88,94
+csv_data = """Alice,88,94
 Bob,72,81
 Charlie,95,99
 Diana,61,68
 Evan,84,87"""
 
-def parse_gradebook(raw_data):
-    # Step 1: Parse string lines as CSV records. Calculate average score for each student.
-    # Return list of tuples: (name, avg_score)
+
+# STEP 1: Parse CSV lines into a list of (name, average) tuples
+def parse_gradebook(raw_text):
     records = []
-    lines = raw_data.strip().split("\\n")
-    for line in lines:
-        parts = line.split(",")
-        name = parts[0]
-        s1 = float(parts[1])
-        s2 = float(parts[2])
-        avg = (s1 + s2) / 2.0
-        records.append((name, avg))
+    # TODO (Step 1): Split raw_text by "\\n", then split each line by ","
+    # Convert the two scores with float(), compute (s1 + s2) / 2, and append (name, avg)
     return records
 
-def compute_grade_metrics(records):
-    # Step 2: Use math.ceil() on maximum average, and math.floor() on minimum average
-    # Return dict: {"max_ceil": math.ceil(max_avg), "min_floor": math.floor(min_avg)}
-    averages = [r[1] for r in records]
-    max_val = max(averages)
-    min_val = min(averages)
-    return {
-        "max_ceil": math.ceil(max_val),
-        "min_floor": math.floor(min_val),
-    }
 
-# Test driver
-parsed = parse_gradebook(csv_raw_records)
-print("Parsed gradebook:", parsed)
-print("Metrics:", compute_grade_metrics(parsed))
+# STEP 2: Return {"highest_ceil": ..., "lowest_floor": ...} using math.ceil and math.floor
+def summarize_scores(records):
+    # TODO (Step 2): Gather all averages and apply math.ceil(max(...)) and math.floor(min(...))
+    return {"highest_ceil": 0, "lowest_floor": 0}
+
+
+# STEP 3: Seed random(42) and pick one student name using random.choice()
+def pick_raffle_winner(records):
+    # TODO (Step 3): Call random.seed(42) and return random.choice([r[0] for r in records])
+    return ""
+
+
+if __name__ == "__main__":
+    parsed = parse_gradebook(csv_data)
+    print("Parsed gradebook:", parsed)
+    print("Summary:", summarize_scores(parsed))
+    print("Raffle winner:", pick_raffle_winner(parsed))
 `,
-    solutionCode: `# Solution: CSV Gradebook Audit & Standard Math Analyzer
+    solutionCode: `# Solution: Class Gradebook & Raffle Winner Picker (PCEP Domain 5)
+
 import math
 import random
 
-csv_raw_records = """Alice,88,94
+csv_data = """Alice,88,94
 Bob,72,81
 Charlie,95,99
 Diana,61,68
 Evan,84,87"""
 
-def parse_gradebook(raw_data):
+def parse_gradebook(raw_text):
     records = []
-    lines = raw_data.strip().split("\\n")
-    for line in lines:
+    for line in raw_text.strip().split("\\n"):
         parts = line.split(",")
         name = parts[0]
-        s1 = float(parts[1])
-        s2 = float(parts[2])
-        avg = (s1 + s2) / 2.0
+        avg = (float(parts[1]) + float(parts[2])) / 2.0
         records.append((name, avg))
     return records
 
-def compute_grade_metrics(records):
+def summarize_scores(records):
     averages = [r[1] for r in records]
     return {
-        "max_ceil": math.ceil(max(averages)),
-        "min_floor": math.floor(min(averages)),
+        "highest_ceil": math.ceil(max(averages)),
+        "lowest_floor": math.floor(min(averages)),
     }
 
-parsed = parse_gradebook(csv_raw_records)
-print("Parsed gradebook:", parsed)
-print("Metrics:", compute_grade_metrics(parsed))
+def pick_raffle_winner(records):
+    random.seed(42)
+    names = [r[0] for r in records]
+    return random.choice(names)
+
+if __name__ == "__main__":
+    parsed = parse_gradebook(csv_data)
+    print("Parsed gradebook:", parsed)
+    print("Summary:", summarize_scores(parsed))
+    print("Raffle winner:", pick_raffle_winner(parsed))
 `,
     steps: [
       {
         stepNumber: 1,
-        title: 'Delimited Record Processing',
-        taskInstruction: 'Parse raw_data by splitting on newlines and commas, converting numeric items to float, and computing average per student.',
+        title: 'Step 1: Parse CSV Rows into (name, avg) Tuples',
+        taskInstruction: 'Inside parse_gradebook(raw_text), loop over raw_text.strip().split("\\n"), split each line by ",", convert parts[1] and parts[2] to float, and append (name, (s1 + s2) / 2.0).',
         targetObjectiveId: '5.3',
+        expectedExample: 'parse_gradebook(csv_data)[0] -> ("Alice", 91.0)',
         breadcrumbs: {
-          level1Concept: 'CSV data is structured as delimiter-separated strings. Splitting by newline yields rows, and splitting each row by comma yields field tokens.',
-          level2Syntax: 'for line in raw_data.strip().split("\\n"):\n    tokens = line.split(",")',
-          level3Scaffold: 'records = []\nfor line in raw_data.strip().split("\\n"):\n    tokens = line.split(",")\n    name, s1, s2 = tokens[0], float(tokens[1]), float(tokens[2])\n    records.append((name, (s1 + s2) / 2))',
+          level1Concept: 'CSV text stores one record per line and separates fields with commas. Splitting twice gives you each value cleanly.',
+          level2Syntax: 'for line in raw_text.strip().split("\\n"):\n    parts = line.split(",")\n    avg = (float(parts[1]) + float(parts[2])) / 2.0\n    records.append((parts[0], avg))',
+          level3Scaffold: 'for line in raw_text.strip().split("\\n"):\n    parts = line.split(",")\n    name = parts[0]\n    avg = (float(parts[1]) + float(parts[2])) / 2.0\n    records.append((name, avg))',
         },
-        validationSnippet: 'assert parse_gradebook(csv_raw_records)[0] == ("Alice", 91.0)',
+        validationSnippet: 'assert parse_gradebook(csv_data)[0] == ("Alice", 91.0)',
       },
       {
         stepNumber: 2,
-        title: 'Standard Library math.ceil() and math.floor()',
-        taskInstruction: 'Implement compute_grade_metrics(records) returning {"max_ceil": math.ceil(max_avg), "min_floor": math.floor(min_avg)}.',
+        title: 'Step 2: Round Highs & Lows with math.ceil / math.floor',
+        taskInstruction: 'Inside summarize_scores(records), extract averages = [r[1] for r in records] and return {"highest_ceil": math.ceil(max(averages)), "lowest_floor": math.floor(min(averages))}.',
         targetObjectiveId: '5.5',
+        expectedExample: '{"highest_ceil": 97, "lowest_floor": 64}',
         breadcrumbs: {
-          level1Concept: 'math.ceil(x) rounds upward to the smallest integer >= x. math.floor(x) rounds downward to the largest integer <= x.',
-          level2Syntax: 'return {"max_ceil": math.ceil(max(averages)), "min_floor": math.floor(min(averages))}',
-          level3Scaffold: 'averages = [r[1] for r in records]\nreturn {\n    "max_ceil": math.ceil(max(averages)),\n    "min_floor": math.floor(min(averages))\n}',
+          level1Concept: 'math.ceil() rounds any decimal up to the nearest whole number; math.floor() rounds down.',
+          level2Syntax: 'averages = [r[1] for r in records]\nreturn {"highest_ceil": math.ceil(max(averages)), "lowest_floor": math.floor(min(averages))}',
+          level3Scaffold: 'averages = [r[1] for r in records]\nreturn {\n    "highest_ceil": math.ceil(max(averages)),\n    "lowest_floor": math.floor(min(averages)),\n}',
         },
-        validationSnippet: 'assert compute_grade_metrics(parse_gradebook(csv_raw_records))["max_ceil"] == 97',
+        validationSnippet: 'assert summarize_scores(parse_gradebook(csv_data)) == {"highest_ceil": 97, "lowest_floor": 64}',
+      },
+      {
+        stepNumber: 3,
+        title: 'Step 3: Pick a Raffle Winner with random.choice()',
+        taskInstruction: 'Inside pick_raffle_winner(records), call random.seed(42) and return random.choice([r[0] for r in records]).',
+        targetObjectiveId: '5.4',
+        expectedExample: 'Returns one student name from the gradebook',
+        breadcrumbs: {
+          level1Concept: 'random.choice(seq) picks one element at random from a list. Calling random.seed(42) makes the pick predictable for testing.',
+          level2Syntax: 'random.seed(42)\nreturn random.choice([r[0] for r in records])',
+          level3Scaffold: 'def pick_raffle_winner(records):\n    random.seed(42)\n    names = [r[0] for r in records]\n    return random.choice(names)',
+        },
+        validationSnippet: 'assert pick_raffle_winner(parse_gradebook(csv_data)) in ["Alice", "Bob", "Charlie", "Diana", "Evan"]',
       },
     ],
   },
@@ -1043,112 +1116,115 @@ export const INITIAL_CHECKLIST_ITEMS: ChecklistItem[] = [
 export const CAPSTONE_PROJECTS: CapstoneProject[] = [
   {
     id: 'cap-01-pycalc-cli',
-    title: 'PyCalc-CLI: Robust Expression Evaluator',
-    subtitle: 'Precedence & Exceptions Engine',
-    domain: 'PCEP Domain 1 & 4 (Precedence & Exceptions)',
-    status: 'synced',
-    statusLabel: 'LIVE REPO',
-    commitsCount: 12,
-    description: 'Full-featured command-line calculator engineered to showcase bitwise shifts, arithmetic precedence according to Python specifications, and defensive handling of ZeroDivisionError and ValueError cascades.',
-    coveragePercent: 98.4,
-    unitTestsPassing: '18/18',
-    tags: ['try...except', 'argparse', 'PyTest Suite', 'v1.0.0 Tagged'],
-    codePreviewSnippet: `def safe_evaluate(expr: str) -> float:
-    try:
-        tokens = tokenize(expr)
-        return shunting_yard(tokens)
-    except (ZeroDivisionError, ValueError) as err:
-        logger.error(f"Fault: {err}")
-        raise PCEPComputationError(err)`,
-    githubRepoUrl: 'https://github.com/pcep-candidate/pycalc-cli-pcep',
-    syllabusGoal: 'Precedence Parsing & Exception Cascades',
-    cornerCasesCount: 18,
+    title: 'Road Trip & Weather Converter',
+    subtitle: 'Operators, Type Casting & Print Formatting',
+    domain: 'PCEP Domain 1 (Fundamentals & Math)',
+    status: 'draft',
+    statusLabel: 'READY TO BUILD',
+    commitsCount: 0,
+    description: 'A clean Python console calculator that converts Celsius to Fahrenheit, splits road-trip miles into fuel stops using // and %, and prints formatted summaries with sep and end.',
+    coveragePercent: 0,
+    unitTestsPassing: '0/3',
+    tags: ['float()', 'floor //', 'modulo %', 'print(sep, end)'],
+    codePreviewSnippet: `def trip_fuel_stops(total_miles, miles_per_tank):
+    full_stops = int(total_miles) // int(miles_per_tank)
+    leftover_miles = int(total_miles) % int(miles_per_tank)
+    return (full_stops, leftover_miles)`,
+    githubRepoUrl: 'https://github.com/pcep-candidate/road-trip-converter',
+    syllabusGoal: 'Operator Precedence & Console Formatting',
+    cornerCasesCount: 3,
   },
   {
-    id: 'cap-02-collection-crafter',
-    title: 'CollectionCrafter: Nested Inventory & Slicing Engine',
-    subtitle: 'Lists, Tuples, Dictionaries, Slices',
-    domain: 'PCEP Domain 3 (Lists, Tuples, Dictionaries, Slices)',
-    status: 'ready',
-    statusLabel: 'READY TO PUSH',
-    commitsCount: 8,
-    description: 'Demonstrates rigorous collection operations: deep copies vs shallow pointer references, negative step multi-dimensional list slicing ([::-1]), tuple key immutability in hashing maps, and nested dictionary transformations.',
-    coveragePercent: 100,
-    unitTestsPassing: '14/14',
-    tags: ['List Comprehensions', 'Tuple Unpacking', 'JSON Serialization'],
-    codePreviewSnippet: `def deep_clone_and_slice(matrix: list[list[int]], step: int = -1):
-    cloned = [row[:] for row in matrix]
-    return [row[::step] for row in cloned[::-1]]`,
-    githubRepoUrl: 'https://github.com/pcep-candidate/collection-crafter',
-    syllabusGoal: 'Sequence In-Place Mutation',
-    cornerCasesCount: 14,
-  },
-  {
-    id: 'cap-03-flowmaster',
-    title: 'FlowMaster: Prime Sieve & Collatz Explorer',
-    subtitle: 'Loops, Branching, break/continue/else',
-    domain: 'PCEP Domain 2 (Loops, Branching, break/continue/else)',
-    status: 'ready',
-    statusLabel: 'READY TO PUBLISH',
-    commitsCount: 6,
-    description: 'Interactive mathematical engine examining loop execution logic. Implements sieve heuristics utilizing for...else blocks (triggering loop post-exhaustion vs break execution) and while...else constructs.',
-    coveragePercent: 94.2,
-    unitTestsPassing: '10/10',
-    tags: ['for...else', 'Range Stepping', 'Collatz Conjecture'],
-    codePreviewSnippet: `def verify_prime_with_loop_else(n: int) -> bool:
-    if n <= 1: return False
-    for divisor in range(2, int(n ** 0.5) + 1):
-        if n % divisor == 0:
+    id: 'cap-02-flowmaster',
+    title: 'Game Score Filter & Countdown Timer',
+    subtitle: 'Decisions, Loops, break & continue',
+    domain: 'PCEP Domain 2 (Control Flow & Loops)',
+    status: 'draft',
+    statusLabel: 'READY TO BUILD',
+    commitsCount: 0,
+    description: 'Build a game score tracker that skips invalid negative scores with continue, stops cleanly at a -1 quit value with break, and counts down using range() with a negative step.',
+    coveragePercent: 0,
+    unitTestsPassing: '0/3',
+    tags: ['if / elif / else', 'break & continue', 'range(-1)'],
+    codePreviewSnippet: `def filter_scores(scores):
+    valid_scores = []
+    for score in scores:
+        if score == -1:
             break
-    else:
-        return True
-    return False`,
-    githubRepoUrl: 'https://github.com/pcep-candidate/flowmaster-sieve',
-    syllabusGoal: 'Loop-Else Flow Exhaustion',
-    cornerCasesCount: 10,
+        if score < 0:
+            continue
+        valid_scores.append(score)
+    return valid_scores`,
+    githubRepoUrl: 'https://github.com/pcep-candidate/game-score-tracker',
+    syllabusGoal: 'Sentinel Loops & Branching',
+    cornerCasesCount: 3,
+  },
+  {
+    id: 'cap-03-collection-crafter',
+    title: 'School Store Cart & Secret Scrambler',
+    subtitle: 'Lists, Sets, Dictionaries & Strings',
+    domain: 'PCEP Domain 3 (Collections & Strings)',
+    status: 'draft',
+    statusLabel: 'READY TO BUILD',
+    commitsCount: 0,
+    description: 'Combine two practical Python apps: a school store receipt formatter using dictionaries, sets, and slicing, plus a Caesar Cipher secret-message scrambler using ord(), chr(), and "".join().',
+    coveragePercent: 0,
+    unitTestsPassing: '0/3',
+    tags: ['dict.get()', 'set()', 'slicing [:n]', 'f-strings'],
+    codePreviewSnippet: `def format_price_label(code, store_catalog):
+    item = store_catalog.get(code)
+    if not item:
+        return "Not found"
+    clean_name = item["name"].upper()
+    return f"[{code}] {clean_name}: $" + f"{item['price']:.2f}"`,
+    githubRepoUrl: 'https://github.com/pcep-candidate/school-store-collections',
+    syllabusGoal: 'Collections & String Immutability',
+    cornerCasesCount: 3,
   },
   {
     id: 'cap-04-custom-exception',
-    title: 'CustomException Logger & Error Dispatcher',
-    subtitle: 'Class Inheritance from BaseException',
-    domain: 'PCEP Domain 4 (Class Inheritance from BaseException)',
+    title: 'Safe Quiz Average & Division Guard',
+    subtitle: 'Functions, *args & try-except Safety',
+    domain: 'PCEP Domain 4 (Functions & Exceptions)',
     status: 'draft',
-    statusLabel: 'DRAFTING CODE',
-    commitsCount: 3,
-    description: 'Builds custom hierarchical exceptions inheriting from Python standard exception classes, parsing traceback stacks and dispatching structured logs without crashing daemon processes.',
-    coveragePercent: 45.0,
-    unitTestsPassing: '4/8',
-    tags: ['Custom Exceptions', 'Traceback Stack', 'Logging Handler'],
-    codePreviewSnippet: `class PCEPValidationError(ValueError):
-    """Raised when syllabus token parsing encounters malformed AST."""
-    def __init__(self, token, line_no):
-        super().__init__(f"Invalid token '{token}' at line {line_no}")
-        self.token = token`,
-    githubRepoUrl: 'https://github.com/pcep-candidate/custom-exception-logger',
-    syllabusGoal: 'Custom Exception Hierarchies',
-    cornerCasesCount: 8,
+    statusLabel: 'READY TO BUILD',
+    commitsCount: 0,
+    description: 'Create reusable Python functions with *args and default bonus parameters, protected by try-except blocks that catch ZeroDivisionError and bad text inputs without crashing.',
+    coveragePercent: 0,
+    unitTestsPassing: '0/3',
+    tags: ['def & *args', 'default args', 'ZeroDivisionError', 'ValueError'],
+    codePreviewSnippet: `def safe_divide(a, b):
+    try:
+        return float(a) / float(b)
+    except ZeroDivisionError:
+        return "Cannot divide by zero"
+    except (ValueError, TypeError):
+        return "Please enter numbers only"`,
+    githubRepoUrl: 'https://github.com/pcep-candidate/safe-quiz-grader',
+    syllabusGoal: 'Reusable Functions & Safe Error Handling',
+    cornerCasesCount: 3,
   },
   {
     id: 'cap-05-file-stream-audit',
-    title: 'FileStreamAudit: Safe CSV & Telemetry Digest Pipeline',
-    subtitle: 'Context Managers, CSV & Standard Modules',
-    domain: 'PCEP Domain 5 (File Handling, CSV & Standard Modules)',
-    status: 'synced',
-    statusLabel: 'LIVE REPO',
-    commitsCount: 9,
-    description: 'Automated batch telemetry pipeline utilizing context managers (with open) for deterministic file handle cleanup, parsing structured CSV datasets with csv.reader, computing statistics with math, and generating pseudorandom audit batches with random.',
-    coveragePercent: 96.5,
-    unitTestsPassing: '12/12',
-    tags: ['csv.reader', 'with open()', 'math.ceil', 'random.sample', 'v1.0.0 Tagged'],
-    codePreviewSnippet: `def parse_and_audit_telemetry(csv_filepath: str) -> dict:
-    with open(csv_filepath, mode='r', encoding='utf-8') as stream:
-        reader = csv.reader(stream)
-        headers = next(reader)
-        samples = [row for row in reader if row]
-    return {"records": len(samples), "checksum": math.trunc(math.sqrt(len(samples)))}`,
-    githubRepoUrl: 'https://github.com/pcep-candidate/filestream-audit-pipeline',
-    syllabusGoal: 'Deterministic File Cleanup & CSV Serialization',
-    cornerCasesCount: 12,
+    title: 'Class Gradebook & Raffle Winner Picker',
+    subtitle: 'CSV Parsing, math & random Modules',
+    domain: 'PCEP Domain 5 (Files & Standard Modules)',
+    status: 'draft',
+    statusLabel: 'READY TO BUILD',
+    commitsCount: 0,
+    description: 'Parse comma-separated (CSV) student quiz records into tuples, round class highs and lows with math.ceil() and math.floor(), and choose a repeatable raffle winner with random.seed().',
+    coveragePercent: 0,
+    unitTestsPassing: '0/3',
+    tags: ['CSV parsing', 'math.ceil()', 'math.floor()', 'random.choice()'],
+    codePreviewSnippet: `def summarize_scores(records):
+    averages = [r[1] for r in records]
+    return {
+        "highest_ceil": math.ceil(max(averages)),
+        "lowest_floor": math.floor(min(averages)),
+    }`,
+    githubRepoUrl: 'https://github.com/pcep-candidate/gradebook-raffle-picker',
+    syllabusGoal: 'CSV Data & Standard Library Modules',
+    cornerCasesCount: 3,
   },
 ];
 

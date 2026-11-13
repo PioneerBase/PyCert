@@ -27,6 +27,7 @@ export interface ProjectStep {
     level3Scaffold: string;
   };
   validationSnippet: string; // Python code snippet or expected output test
+  expectedExample?: string;
   starterSnippet?: string;
 }
 
@@ -41,6 +42,10 @@ export interface MicroProject {
   specificObjectives: string[];
   description: string;
   learningOutcomes: string[];
+  fileName?: string;
+  testFileName?: string;
+  keyTip?: string;
+  pitfallWarning?: string;
   starterCode: string;
   solutionCode: string;
   steps: ProjectStep[];

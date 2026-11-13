@@ -30,6 +30,7 @@ export const HomeDashboard: React.FC = () => {
   const {
     setActiveView,
     selectProject,
+    currentProject,
     currentUser,
     completedStepsMap,
     readinessPercentage,
@@ -147,10 +148,15 @@ export const HomeDashboard: React.FC = () => {
     },
   ];
 
-  const handleLaunchCaesarCipher = () => {
-    const cipherProj =
-      MICRO_PROJECTS.find((p) => p.id === 'proj-03-caesar-cipher') || MICRO_PROJECTS[0];
-    selectProject(cipherProj.id);
+  const featuredCompleted = completedStepsMap[currentProject.id]?.length || 0;
+  const featuredTotal = currentProject.steps.length;
+  const featuredPct = featuredTotal > 0 ? Math.round((featuredCompleted / featuredTotal) * 100) : 0;
+  const nextStepObj =
+    currentProject.steps.find((s) => !(completedStepsMap[currentProject.id] || []).includes(s.stepNumber)) ||
+    currentProject.steps[0];
+
+  const handleLaunchFeaturedLab = () => {
+    selectProject(currentProject.id);
     setActiveView('workspace');
   };
 
@@ -416,7 +422,6 @@ export const HomeDashboard: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
                 <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-[#2C3E50] dark:text-[#F5F5DC]">
                   ADAPTIVE FLASHCARD DRILL
                 </span>
@@ -509,56 +514,58 @@ export const HomeDashboard: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Code2 className="w-4 h-4 text-[#1E3A78] dark:text-[#BDC3C7]" />
                 <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-[#2C3E50] dark:text-[#F5F5DC]">
-                  FEATURED SYLLABUS LAB
+                  RECOMMENDED SYLLABUS LAB
                 </span>
               </div>
 
               <span className="px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-[#1E3A78]/15 dark:bg-[#1E3A78]/40 text-[#1E3A78] dark:text-[#F5F5DC] border border-[#1E3A78]/30">
-                Domain 3
+                Domain {currentProject.sectionNumber}
               </span>
             </div>
 
             <div className="space-y-1.5">
               <h3 className="text-lg font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
-                Interactive CLI Caesar Cipher
+                {currentProject.title}
               </h3>
               <p className="text-xs text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed">
-                Solidify string slicing, ASCII boundary transforms, and list index iterations by completing the decode rotation loop.
+                {currentProject.description}
               </p>
             </div>
 
             {/* Keyword tags */}
             <div className="flex flex-wrap gap-1.5 font-mono text-[10px]">
-              {['ord()', 'chr()', 'modulo % 26', 'for loops'].map((tag) => (
+              {currentProject.specificObjectives.map((objId) => (
                 <span
-                  key={tag}
+                  key={objId}
                   className="px-2 py-0.5 rounded bg-white dark:bg-[#1A2634] text-[#2C3E50] dark:text-[#BDC3C7] border border-[#BDC3C7]/60 dark:border-[#2C3E50]"
                 >
-                  {tag}
+                  Obj {objId}
                 </span>
               ))}
             </div>
 
             {/* Progress Container */}
             <div className="p-4 rounded-xl bg-white dark:bg-[#1A2634] border border-[#BDC3C7] dark:border-[#2C3E50] space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-[#2C3E50] dark:text-[#F5F5DC]">
-                  Milestone 3/5: Rotate Uppercase
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-[#2C3E50] dark:text-[#F5F5DC] truncate">
+                  {featuredCompleted === featuredTotal
+                    ? `All ${featuredTotal} Steps Complete`
+                    : `Next: ${nextStepObj.title}`}
                 </span>
-                <span className="font-mono text-[11px] font-bold text-[#1E3A78] dark:text-[#BDC3C7]">
-                  60% Complete
+                <span className="font-mono text-[11px] font-bold text-[#1E3A78] dark:text-[#BDC3C7] shrink-0 tabular-nums">
+                  {featuredPct}% Complete
                 </span>
               </div>
 
               <div className="w-full h-2 rounded-full bg-[#E5E5D8] dark:bg-[#2C3E50] overflow-hidden">
-                <div className="h-full bg-[#1E3A78] dark:bg-[#BDC3C7]" style={{ width: '60%' }} />
+                <div className="h-full bg-[#1E3A78] dark:bg-[#BDC3C7] transition-all" style={{ width: `${featuredPct}%` }} />
               </div>
 
-              <div className="flex items-center justify-between text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7] font-mono pt-1">
-                <span>Auto-graded tests: 4 / 6 passing</span>
-                <span className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
+              <div className="flex items-center justify-between text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7] font-mono pt-1 tabular-nums">
+                <span>Steps passed: {featuredCompleted} / {featuredTotal}</span>
+                <span className="text-[#1E3A78] dark:text-[#BDC3C7] font-semibold flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" />
-                  <span>Git Synced</span>
+                  <span>{currentProject.estimatedMinutes} min</span>
                 </span>
               </div>
             </div>
@@ -567,11 +574,11 @@ export const HomeDashboard: React.FC = () => {
           {/* Action Button */}
           <div className="pt-4 border-t border-[#BDC3C7]/40 dark:border-[#2C3E50] flex items-center gap-3">
             <button
-              onClick={handleLaunchCaesarCipher}
+              onClick={handleLaunchFeaturedLab}
               className="flex-1 py-2.5 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#5A1827] hover:bg-[#48121E] dark:bg-[#6B1D2F] dark:hover:bg-[#541624] shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <Code2 className="w-4 h-4" />
-              <span>Resume in Workspace</span>
+              <span>{featuredCompleted > 0 ? 'Resume Lab in IDE' : 'Start Lab in IDE'}</span>
             </button>
           </div>
         </div>
