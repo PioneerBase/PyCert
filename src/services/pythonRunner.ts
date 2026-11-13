@@ -252,32 +252,130 @@ function simulatePythonCode(code: string, startTime: number): ExecutionResult {
       if (printBuffer.trim()) {
         outputLines.push(printBuffer.trimEnd());
       }
-    } catch (innerError: any) {
-      // If code was pure Python with custom syntax, provide descriptive trace
-      outputLines.push(`>>> Executing Python script...`);
+    } catch {
+      // If browser is offline or Pyodide is still warming up, evaluate PCEP lab functions cleanly
       if (code.includes('__STEP_CHECK__')) {
-        const hasTodo = /#\s*TODO/i.test(code) && (code.includes('return 0.0') || code.includes('return []') || code.includes('return ""') || code.includes('return None') || code.includes('pass'));
-        if (hasTodo) {
-          outputLines.push('__STEP_RESULT__:1:FAIL:Incomplete TODO placeholder');
-        } else {
-          outputLines.push('__STEP_RESULT__:1:PASS');
-          outputLines.push('__STEP_RESULT__:2:PASS');
-          outputLines.push('__STEP_RESULT__:3:PASS');
+        const extractFnBody = (fnName: string): string => {
+          const match = code.match(new RegExp(`def\\s+${fnName}\\s*\\([^)]*\\):([\\s\\S]*?)(?=\\ndef\\s+|\\nif\\s+__name__|\\ntry:|$)`));
+          return match ? match[1] : '';
+        };
+
+        // Lab 1 checks
+        if (code.includes('def celsius_to_fahrenheit')) {
+          const b1 = extractFnBody('celsius_to_fahrenheit');
+          const b2 = extractFnBody('trip_fuel_stops');
+          const b3 = extractFnBody('format_trip_banner');
+          outputLines.push(
+            b1.includes('9') && b1.includes('5') && b1.includes('32') && !b1.includes('fahrenheit = 0.0')
+              ? '__STEP_RESULT__:1:PASS'
+              : '__STEP_RESULT__:1:FAIL:Returned 0.0 — replace 0.0 with (float(celsius) * 9 / 5) + 32'
+          );
+          outputLines.push(
+            b2.includes('//') && b2.includes('%') && !b2.includes('full_stops = 0')
+              ? '__STEP_RESULT__:2:PASS'
+              : '__STEP_RESULT__:2:FAIL:Returned (0, 0) — use // for full_stops and % for leftover_miles'
+          );
+          outputLines.push(
+            (b3.includes('temp_f') && b3.includes('stops') && b3.includes('extra')) && !b3.includes('return ""')
+              ? '__STEP_RESULT__:3:PASS'
+              : '__STEP_RESULT__:3:FAIL:Returned "" — format temp_f, stops, and extra into the banner string'
+          );
+        }
+        // Lab 2 checks
+        else if (code.includes('def get_medal')) {
+          const b1 = extractFnBody('get_medal');
+          const b2 = extractFnBody('launch_countdown');
+          const b3 = extractFnBody('filter_scores');
+          outputLines.push(
+            b1.includes('Gold') && b1.includes('Silver') && b1.includes('Bronze') && b1.includes('if')
+              ? '__STEP_RESULT__:1:PASS'
+              : '__STEP_RESULT__:1:FAIL:Returned "" — add if/elif/else for Gold (90+), Silver (70+), Bronze'
+          );
+          outputLines.push(
+            b2.includes('range') && b2.includes('-1') && !b2.includes('return []')
+              ? '__STEP_RESULT__:2:PASS'
+              : '__STEP_RESULT__:2:FAIL:Returned [] — return list(range(start_num, 0, -1))'
+          );
+          outputLines.push(
+            b3.includes('break') && b3.includes('continue') && b3.includes('append')
+              ? '__STEP_RESULT__:3:PASS'
+              : '__STEP_RESULT__:3:FAIL:Missing break / continue / append inside filter_scores loop'
+          );
+        }
+        // Lab 3 checks
+        else if (code.includes('def get_top_items')) {
+          const b1 = extractFnBody('get_top_items');
+          const b2 = extractFnBody('get_unique_categories');
+          const b3 = extractFnBody('format_price_label');
+          outputLines.push(
+            b1.includes('[:') && !b1.includes('return []')
+              ? '__STEP_RESULT__:1:PASS'
+              : '__STEP_RESULT__:1:FAIL:Returned [] — use list slicing item_codes[:count]'
+          );
+          outputLines.push(
+            b2.includes('.add(') && b2.includes('for')
+              ? '__STEP_RESULT__:2:PASS'
+              : '__STEP_RESULT__:2:FAIL:Returned empty set() — loop through tags and call categories.add(tag)'
+          );
+          outputLines.push(
+            b3.includes('.upper()') && b3.includes('.2f') && !b3.includes('return ""')
+              ? '__STEP_RESULT__:3:PASS'
+              : '__STEP_RESULT__:3:FAIL:Returned "" — format name with .upper() and price with :.2f'
+          );
+        }
+        // Lab 4 checks
+        else if (code.includes('def average_score')) {
+          const b1 = extractFnBody('average_score');
+          const b2 = extractFnBody('safe_divide');
+          outputLines.push(
+            b1.includes('sum(') && b1.includes('len(') && !b1.includes('return 0.0\n')
+              ? '__STEP_RESULT__:1:PASS'
+              : '__STEP_RESULT__:1:FAIL:Returned 0.0 — compute (sum(scores) / len(scores)) + bonus'
+          );
+          outputLines.push(
+            b2.includes('try:') && b2.includes('ZeroDivisionError')
+              ? '__STEP_RESULT__:2:PASS'
+              : '__STEP_RESULT__:2:FAIL:Missing try: / except ZeroDivisionError: block'
+          );
+          outputLines.push(
+            b2.includes('ValueError') && b2.includes('TypeError')
+              ? '__STEP_RESULT__:3:PASS'
+              : '__STEP_RESULT__:3:FAIL:Missing except (ValueError, TypeError): block'
+          );
+        }
+        // Lab 5 checks
+        else if (code.includes('def parse_gradebook')) {
+          const b1 = extractFnBody('parse_gradebook');
+          const b2 = extractFnBody('summarize_scores');
+          const b3 = extractFnBody('pick_raffle_winner');
+          outputLines.push(
+            b1.includes('split(') && b1.includes('float(') && b1.includes('append(')
+              ? '__STEP_RESULT__:1:PASS'
+              : '__STEP_RESULT__:1:FAIL:Returned [] — split CSV lines, cast scores with float(), and append (name, avg)'
+          );
+          outputLines.push(
+            b2.includes('math.ceil') && b2.includes('math.floor')
+              ? '__STEP_RESULT__:2:PASS'
+              : '__STEP_RESULT__:2:FAIL:Returned 0s — use math.ceil(max(averages)) and math.floor(min(averages))'
+          );
+          outputLines.push(
+            b3.includes('random.seed') && b3.includes('random.choice')
+              ? '__STEP_RESULT__:3:PASS'
+              : '__STEP_RESULT__:3:FAIL:Returned "" — call random.seed(42) and return random.choice(names)'
+          );
         }
       } else if (code.includes('celsius_to_fahrenheit')) {
-        outputLines.push('=== Road Trip & Weather Summary ===\n25.0 C | 77.0 F | Stops: 2 | Extra miles: 50\n[Done]');
+        outputLines.push('Road Trip Summary: -> 77.0 F | 2 stops | 50 mi left\n[Done]');
       } else if (code.includes('filter_scores')) {
-        outputLines.push('Valid scores: [85, 92]\nCountdown: [5, 4, 3, 2, 1]\nMedal for 95: Gold');
-      } else if (code.includes('caesar_cipher')) {
-        outputLines.push('Encoded: SBWKRQ\nDecoded: MZBM');
+        outputLines.push('Medal for 95: Gold\nCountdown: [5, 4, 3, 2, 1]\nValid scores: [85, 92]');
       } else if (code.includes('format_price_label')) {
-        outputLines.push("Categories: {'tech', 'math', 'writing', 'school'}\n[ITEM-1] GRAPHING CALCULATOR: $89.99\nTop 2 items: ['ITEM-1', 'ITEM-2']");
+        outputLines.push("Top 2: ['ITEM-1', 'ITEM-2']\nCategories: {'tech', 'math', 'writing', 'school'}\n[ITEM-1] GRAPHING CALCULATOR: $89.99");
       } else if (code.includes('average_score')) {
         outputLines.push('Average with bonus: 92.0\n10 / 2 = 5.0\n10 / 0 = Cannot divide by zero\n10 / abc = Please enter numbers only');
       } else if (code.includes('parse_gradebook')) {
         outputLines.push("Parsed gradebook: [('Alice', 91.0), ('Bob', 76.5), ('Charlie', 97.0), ('Diana', 64.5), ('Evan', 85.5)]\nSummary: {'highest_ceil': 97, 'lowest_floor': 64}\nRaffle winner: Charlie");
       } else {
-        outputLines.push(`Output: Program evaluated successfully.`);
+        outputLines.push('Program evaluated.');
       }
     }
   } catch (fatal: any) {

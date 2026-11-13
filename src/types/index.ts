@@ -21,6 +21,10 @@ export interface ProjectStep {
   title: string;
   taskInstruction: string;
   targetObjectiveId: string;
+  patternTitle?: string;
+  patternCode?: string;
+  patternExplanation?: string;
+  diagnosticExpr?: string; // Python expression to evaluate and show actual return value on failure
   breadcrumbs: {
     level1Concept: string;
     level2Syntax: string;

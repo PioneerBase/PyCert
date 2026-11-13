@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useProgress } from '../context/ProgressContext';
 import { MICRO_PROJECTS } from '../data/pcepCurriculum';
+import { ProjectStep } from '../types';
 import { executePythonCode, ExecutionResult } from '../services/pythonRunner';
 import { BreadcrumbsDrawer } from './BreadcrumbsDrawer';
 import {
@@ -18,6 +19,7 @@ import {
   GitCommit,
   ArrowRight,
   ListChecks,
+  BookOpen,
 } from 'lucide-react';
 
 interface StepTestStatus {
@@ -48,8 +50,9 @@ export const Workspace: React.FC = () => {
   const [outputTab, setOutputTab] = useState<'repl' | 'test'>('repl');
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isRunningTests, setIsRunningTests] = useState<boolean>(false);
+  const [checkingStepNum, setCheckingStepNum] = useState<number | null>(null);
   const [terminalOutput, setTerminalOutput] = useState<string>(
-    '>>> Ready. Follow Steps 1 to 3 on the left, then click "Run Code" or "Run Tests".\n'
+    '>>> Ready. Follow Step 1 -> Step 2 -> Step 3 on the left, then click "Check Step" or "Run Tests".\n'
   );
   const [executionMeta, setExecutionMeta] = useState<{
     engine: string;
@@ -61,6 +64,7 @@ export const Workspace: React.FC = () => {
   const [stepTestMap, setStepTestMap] = useState<Record<number, { passed: boolean; failureMessage?: string }>>({});
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const gutterRef = useRef<HTMLDivElement>(null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
   const currentStep = currentProject.steps[currentStepIndex] || currentProject.steps[0];
@@ -72,7 +76,7 @@ export const Workspace: React.FC = () => {
     setStepTestMap({});
     setActiveTab('source');
     setTerminalOutput(
-      `>>> Loaded "${currentProject.title}" (${fileName}).\n>>> Read Step 1 on the left and click "Run Code" or "Run Tests" anytime.\n`
+      `>>> Loaded "${currentProject.title}" (${fileName}).\n>>> Start with Step 1 on the left: read the Worked Pattern, edit ${fileName}, then click "Check Step 1".\n`
     );
   }, [currentProject.id, currentProject.title, fileName]);
 
@@ -82,7 +86,7 @@ export const Workspace: React.FC = () => {
   }, [terminalOutput]);
 
   const codeLines = currentCode.split('\n');
-  const editorRows = Math.max(22, codeLines.length + 3);
+  const gutterLineCount = Math.max(28, codeLines.length + 12);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const textarea = textareaRef.current;
@@ -153,21 +157,81 @@ export const Workspace: React.FC = () => {
     setIsRunning(false);
   };
 
+  const buildStepCheckPython = (step: ProjectStep) => {
+    const escapedSnippet = step.validationSnippet.replace(/\\/g, '\\\\');
+    const actualExpr = step.diagnosticExpr || 'None';
+    return `try:
+    ${escapedSnippet.split('\n').join('\n    ')}
+    print("__STEP_RESULT__:${step.stepNumber}:PASS")
+except AssertionError:
+    try:
+        _got = repr(${actualExpr})
+    except Exception as _inner:
+        _got = f"<error: {_inner}>"
+    print(f"__STEP_RESULT__:${step.stepNumber}:FAIL:Got {_got} (expected ${step.expectedExample ? step.expectedExample.replace(/"/g, "'") : 'matching output'})")
+except Exception as _err:
+    print(f"__STEP_RESULT__:${step.stepNumber}:FAIL:{type(_err).__name__}: {_err}")`;
+  };
+
+  const handleRunSingleStep = async (step: ProjectStep) => {
+    setCheckingStepNum(step.stepNumber);
+    setOutputTab('test');
+
+    const testRunnerScript = `# __STEP_CHECK__
+${currentCode}
+
+${buildStepCheckPython(step)}
+`;
+
+    const execResult = await executePythonCode(testRunnerScript);
+    const stdoutLines = (execResult.stdout || '').split('\n');
+    const markerPrefix = `__STEP_RESULT__:${step.stepNumber}:`;
+    const matchedLine = stdoutLines.find((line) => line.startsWith(markerPrefix));
+
+    if (matchedLine && matchedLine.includes(':PASS')) {
+      setStepTestMap((prev) => ({
+        ...prev,
+        [step.stepNumber]: { passed: true },
+      }));
+      markStepComplete(step.stepNumber);
+      setTerminalOutput(
+        (prev) =>
+          prev +
+          `\n$ check step_${step.stepNumber} (${fileName})\n[PASS] Step ${step.stepNumber}: ${step.title}\n`
+      );
+    } else {
+      const msg =
+        matchedLine && matchedLine.includes(':FAIL:')
+          ? matchedLine.split(':FAIL:')[1]
+          : execResult.isError && execResult.stderr
+          ? execResult.stderr.split('\n').slice(-2).join(' ')
+          : 'Output does not match expected check yet.';
+
+      setStepTestMap((prev) => ({
+        ...prev,
+        [step.stepNumber]: { passed: false, failureMessage: msg },
+      }));
+      setTerminalOutput(
+        (prev) =>
+          prev +
+          `\n$ check step_${step.stepNumber} (${fileName})\n[TRY AGAIN] Step ${step.stepNumber}: ${msg}\n`
+      );
+    }
+
+    setExecutionMeta({
+      engine: execResult.engine,
+      durationMs: execResult.durationMs,
+      isError: execResult.isError,
+    });
+    setCheckingStepNum(null);
+  };
+
   const handleRunTests = async () => {
     setIsRunningTests(true);
     setOutputTab('test');
 
     // Build dynamic Python step-by-step test runner from currentProject.steps
-    const stepChecksPython = currentProject.steps
-      .map((step) => {
-        const escapedSnippet = step.validationSnippet.replace(/\\/g, '\\\\');
-        return `try:
-    ${escapedSnippet.split('\n').join('\n    ')}
-    print("__STEP_RESULT__:${step.stepNumber}:PASS")
-except Exception as _err:
-    print(f"__STEP_RESULT__:${step.stepNumber}:FAIL:{type(_err).__name__}: {_err}")`;
-      })
-      .join('\n\n');
+    const stepChecksPython = currentProject.steps.map(buildStepCheckPython).join('\n\n');
 
     const testRunnerScript = `# __STEP_CHECK__
 ${currentCode}
@@ -391,12 +455,13 @@ ${summaryFooter}
               {currentProject.steps.map((step, idx) => {
                 const isSelected = idx === currentStepIndex;
                 const isComplete = completedSteps.includes(step.stepNumber);
+                const runState = stepTestMap[step.stepNumber];
 
                 return (
                   <div
                     key={step.stepNumber}
                     onClick={() => setCurrentStepIndex(idx)}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-2 ${
+                    className={`p-3.5 rounded-xl border transition-all cursor-pointer space-y-2.5 ${
                       isSelected
                         ? 'border-[#1E3A78] dark:border-amber-400/70 bg-white dark:bg-[#1A2634] shadow-xs'
                         : isComplete
@@ -429,30 +494,72 @@ ${summaryFooter}
                       </span>
                     </div>
 
-                    <p className="text-xs text-[#2C3E50]/85 dark:text-[#BDC3C7] leading-relaxed pl-7">
+                    <p className="text-xs text-[#2C3E50]/90 dark:text-[#BDC3C7] leading-relaxed pl-7">
                       {step.taskInstruction}
                     </p>
 
+                    {isSelected && step.patternCode && (
+                      <div className="ml-7 p-3 rounded-lg bg-[#FAF9F5] dark:bg-[#141C24] border border-[#BDC3C7]/70 dark:border-[#2C3E50] space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#1E3A78] dark:text-amber-300">
+                          <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                          <span>{step.patternTitle || 'Worked Pattern Example'}</span>
+                        </div>
+                        <pre className="p-2.5 rounded-md bg-[#1E2936] text-emerald-300 font-mono text-[11px] overflow-x-auto leading-relaxed">
+                          <code>{step.patternCode}</code>
+                        </pre>
+                        {step.patternExplanation && (
+                          <p className="text-[11px] text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed">
+                            {step.patternExplanation}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
                     {step.expectedExample && (
                       <div className="pl-7 text-[11px] font-mono text-[#1E3A78] dark:text-sky-300">
-                        Example: <code>{step.expectedExample}</code>
+                        Target check: <code>{step.expectedExample}</code>
+                      </div>
+                    )}
+
+                    {runState && !runState.passed && runState.failureMessage && (
+                      <div className="ml-7 p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-500/40 text-[11px] font-mono text-rose-700 dark:text-rose-300">
+                        {runState.failureMessage}
                       </div>
                     )}
 
                     {isSelected && (
-                      <div className="pl-7 pt-1 flex items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCurrentStepIndex(idx);
-                            setIsBreadcrumbsOpen(true);
-                          }}
-                          className="text-[11px] font-semibold text-[#5A1827] dark:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <Lightbulb className="w-3.5 h-3.5" />
-                          <span>Open Step {step.stepNumber} Hint</span>
-                        </button>
+                      <div className="pl-7 pt-1 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={checkingStepNum === step.stepNumber}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRunSingleStep(step);
+                            }}
+                            className="px-3 py-1.5 rounded-md text-[11px] font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            <FlaskConical className="w-3 h-3" />
+                            <span>
+                              {checkingStepNum === step.stepNumber
+                                ? `Checking Step ${step.stepNumber}...`
+                                : `Check Step ${step.stepNumber}`}
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCurrentStepIndex(idx);
+                              setIsBreadcrumbsOpen(true);
+                            }}
+                            className="text-[11px] font-semibold text-[#5A1827] dark:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <Lightbulb className="w-3.5 h-3.5" />
+                            <span>Hint</span>
+                          </button>
+                        </div>
 
                         {idx < currentProject.steps.length - 1 && (
                           <button
@@ -632,37 +739,40 @@ ${summaryFooter}
               </div>
             </div>
 
-            {/* Code Content Area - Expanded Natural Multi-Line Viewport */}
+            {/* Code Content Area - Full 540px Explicit Scrollable IDE Viewport */}
             {activeTab === 'source' ? (
-              <div
-                onClick={() => textareaRef.current?.focus()}
-                className="flex h-[520px] overflow-y-auto bg-[#1E2936] cursor-text"
-              >
-                {/* Synchronized Line Numbers Gutter */}
-                <div className="py-4 pl-3 pr-3 select-none text-right font-mono text-[13px] leading-6 text-[#BDC3C7]/45 border-r border-[#2C3E50] bg-[#18222D] shrink-0 tabular-nums">
-                  {Array.from({ length: Math.max(20, codeLines.length) }, (_, i) => (
+              <div className="flex h-[540px] bg-[#1E2936]">
+                {/* Scroll-Synced Line Numbers Gutter */}
+                <div
+                  ref={gutterRef}
+                  onClick={() => textareaRef.current?.focus()}
+                  className="w-12 h-[540px] overflow-hidden py-4 pb-16 pl-2 pr-3 select-none text-right font-mono text-[13px] leading-6 text-[#BDC3C7]/45 border-r border-[#2C3E50] bg-[#18222D] shrink-0 tabular-nums cursor-text"
+                >
+                  {Array.from({ length: gutterLineCount }, (_, i) => (
                     <div key={i} className="h-6 leading-6">
                       {i + 1 < 10 ? `0${i + 1}` : i + 1}
                     </div>
                   ))}
                 </div>
 
-                {/* Full-Height Auto-Sized Code Textarea */}
-                <div className="flex-1 overflow-x-auto">
-                  <textarea
-                    ref={textareaRef}
-                    value={currentCode}
-                    onChange={(e) => setCurrentCode(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    rows={editorRows}
-                    wrap="off"
-                    spellCheck={false}
-                    autoCapitalize="off"
-                    autoComplete="off"
-                    aria-label="Python code editor"
-                    className="w-full min-w-full min-h-full py-4 px-4 font-mono text-[13px] leading-6 text-[#F5F5DC] bg-transparent resize-none overflow-hidden focus:outline-hidden whitespace-pre selection:bg-[#1E3A78]/70 selection:text-[#F5F5DC]"
-                  />
-                </div>
+                {/* Native Scrollable Code Textarea */}
+                <textarea
+                  ref={textareaRef}
+                  value={currentCode}
+                  onChange={(e) => setCurrentCode(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onScroll={(e) => {
+                    if (gutterRef.current) {
+                      gutterRef.current.scrollTop = e.currentTarget.scrollTop;
+                    }
+                  }}
+                  wrap="off"
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoComplete="off"
+                  aria-label="Python code editor"
+                  className="flex-1 block w-full h-[540px] py-4 px-4 font-mono text-[13px] leading-6 text-[#F5F5DC] bg-[#1E2936] resize-none overflow-y-auto overflow-x-auto focus:outline-hidden whitespace-pre selection:bg-[#1E3A78]/70 selection:text-[#F5F5DC]"
+                />
               </div>
             ) : activeTab === 'tests' ? (
               <div className="p-5 font-mono text-[13px] text-[#F5F5DC] bg-[#1E2936] h-[520px] overflow-y-auto leading-6">

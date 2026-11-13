@@ -50,6 +50,7 @@ interface ProgressContextType {
 }
 
 const STORAGE_KEY = 'pycert_user_progress_v1';
+const CURRICULUM_VERSION = 3;
 
 function computeStreak(activityHistory: string[]): { currentStreak: number; hasPracticedToday: boolean } {
   if (!activityHistory || activityHistory.length === 0) {
@@ -140,8 +141,22 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed.completedStepsMap) setCompletedStepsMap(parsed.completedStepsMap);
-        if (parsed.codeSnapshots) setCodeSnapshots(parsed.codeSnapshots);
+        if (parsed.completedStepsMap) {
+          // Clean up any removed project IDs (e.g., old proj-03-caesar-cipher)
+          const validIds = new Set(MICRO_PROJECTS.map((p) => p.id));
+          const cleanedStepsMap: Record<string, number[]> = {};
+          Object.entries(parsed.completedStepsMap).forEach(([k, v]) => {
+            if (validIds.has(k) && Array.isArray(v)) {
+              cleanedStepsMap[k] = v;
+            }
+          });
+          setCompletedStepsMap(cleanedStepsMap);
+        }
+        if (parsed.codeSnapshots && parsed.curriculumVersion === CURRICULUM_VERSION) {
+          setCodeSnapshots(parsed.codeSnapshots);
+        } else {
+          setCodeSnapshots({});
+        }
         if (parsed.flashcards) {
           const mergedFlashcards = parsed.flashcards.map((f: Flashcard) => {
             const initial = INITIAL_FLASHCARDS.find((ic) => ic.id === f.id);
@@ -182,6 +197,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
+          curriculumVersion: CURRICULUM_VERSION,
           completedStepsMap,
           codeSnapshots,
           flashcards,
@@ -395,6 +411,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({
+          curriculumVersion: CURRICULUM_VERSION,
           completedStepsMap: {},
           codeSnapshots: {},
           flashcards: INITIAL_FLASHCARDS,

@@ -47,14 +47,14 @@ export const HowToGuideModal: React.FC = () => {
       navHighlightView: 'home',
     },
     {
-      title: 'In-Browser IDE & Automated PyTest Matrix',
-      tagline: 'Instant Feedback Without Local Machine Configuration',
+      title: 'Step-by-Step Syllabus Labs & In-Browser IDE',
+      tagline: 'Repeatable Worked Pattern -> Code -> Instant Check',
       description:
-        'The Syllabus Labs IDE executes real Python in your browser via WebAssembly. Every exercise features standard PyTest unit tests with boundary corner cases.',
+        'Each lab breaks a PCEP domain into 3 clear steps you can complete in order from top to bottom inside the built-in Python IDE.',
       bulletPoints: [
-        'Click "Run Tests (Cmd+Enter)" to execute your solution against acceptance criteria.',
-        'View live execution outputs in the Terminal console and Inspect Variables tab.',
-        'Green checkmarks appear as your code satisfies each syllabus specification.',
+        'Read the Worked Pattern example on the left to see how Python solves that type of task.',
+        'Replace the # TODO line in the full-height editor, then click "Check Step" for instant feedback.',
+        'Run all steps anytime with "Run Tests (Ctrl+Enter)" to watch green checkmarks light up.',
       ],
       icon: <Code2 className="w-6 h-6 text-emerald-400" />,
       navHighlightView: 'workspace',

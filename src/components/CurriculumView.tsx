@@ -4,7 +4,7 @@ import { PCEP_SECTIONS, MICRO_PROJECTS } from '../data/pcepCurriculum';
 import { BookOpen, ChevronRight, Clock, Award, Terminal, ArrowRight, CheckCircle2, Sparkles, Filter } from 'lucide-react';
 
 export const CurriculumView: React.FC = () => {
-  const { selectProject, completedSteps, checklistItems, flashcards } = useProgress();
+  const { selectProject, completedStepsMap } = useProgress();
   const [selectedSectionFilter, setSelectedSectionFilter] = useState<number | 'all'>('all');
   const [expandedSectionNumber, setExpandedSectionNumber] = useState<number | null>(null);
 
@@ -228,7 +228,8 @@ export const CurriculumView: React.FC = () => {
         {/* Micro-Projects Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => {
-            const completedCount = (completedSteps && project.id) ? (project.steps.filter((s) => completedSteps.includes(s.stepNumber)).length) : 0;
+            const projDoneSteps = completedStepsMap[project.id] || [];
+            const completedCount = project.steps.filter((s) => projDoneSteps.includes(s.stepNumber)).length;
             const isFullyComplete = completedCount === project.steps.length;
 
             return (
