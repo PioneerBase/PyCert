@@ -1060,7 +1060,7 @@ export const CAPSTONE_PROJECTS: CapstoneProject[] = [
     except (ZeroDivisionError, ValueError) as err:
         logger.error(f"Fault: {err}")
         raise PCEPComputationError(err)`,
-    githubRepoUrl: 'https://github.com/devonvance/pycalc-cli-pcep',
+    githubRepoUrl: 'https://github.com/pcep-candidate/pycalc-cli-pcep',
     syllabusGoal: 'Precedence Parsing & Exception Cascades',
     cornerCasesCount: 18,
   },
@@ -1079,7 +1079,7 @@ export const CAPSTONE_PROJECTS: CapstoneProject[] = [
     codePreviewSnippet: `def deep_clone_and_slice(matrix: list[list[int]], step: int = -1):
     cloned = [row[:] for row in matrix]
     return [row[::step] for row in cloned[::-1]]`,
-    githubRepoUrl: 'https://github.com/devonvance/collection-crafter',
+    githubRepoUrl: 'https://github.com/pcep-candidate/collection-crafter',
     syllabusGoal: 'Sequence In-Place Mutation',
     cornerCasesCount: 14,
   },
@@ -1103,7 +1103,7 @@ export const CAPSTONE_PROJECTS: CapstoneProject[] = [
     else:
         return True
     return False`,
-    githubRepoUrl: 'https://github.com/devonvance/flowmaster-sieve',
+    githubRepoUrl: 'https://github.com/pcep-candidate/flowmaster-sieve',
     syllabusGoal: 'Loop-Else Flow Exhaustion',
     cornerCasesCount: 10,
   },
@@ -1124,7 +1124,7 @@ export const CAPSTONE_PROJECTS: CapstoneProject[] = [
     def __init__(self, token, line_no):
         super().__init__(f"Invalid token '{token}' at line {line_no}")
         self.token = token`,
-    githubRepoUrl: 'https://github.com/devonvance/custom-exception-logger',
+    githubRepoUrl: 'https://github.com/pcep-candidate/custom-exception-logger',
     syllabusGoal: 'Custom Exception Hierarchies',
     cornerCasesCount: 8,
   },
@@ -1146,7 +1146,7 @@ export const CAPSTONE_PROJECTS: CapstoneProject[] = [
         headers = next(reader)
         samples = [row for row in reader if row]
     return {"records": len(samples), "checksum": math.trunc(math.sqrt(len(samples)))}`,
-    githubRepoUrl: 'https://github.com/devonvance/filestream-audit-pipeline',
+    githubRepoUrl: 'https://github.com/pcep-candidate/filestream-audit-pipeline',
     syllabusGoal: 'Deterministic File Cleanup & CSV Serialization',
     cornerCasesCount: 12,
   },

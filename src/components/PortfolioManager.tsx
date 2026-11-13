@@ -394,7 +394,7 @@ export const PortfolioManager: React.FC = () => {
 
                     {project.status === 'synced' ? (
                       <a
-                        href={project.githubRepoUrl}
+                        href={`https://github.com/${currentUser.githubHandle || 'pcep-candidate'}/${project.githubRepoUrl.split('/').pop() || project.id}`}
                         target="_blank"
                         rel="noreferrer"
                         className="px-3.5 py-1.5 text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] rounded-lg shadow-xs transition-colors flex items-center gap-1"

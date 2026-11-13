@@ -34,6 +34,17 @@ export const BreadcrumbsDrawer: React.FC<BreadcrumbsDrawerProps> = ({
     setTimeout(() => setCopiedTier(null), 2000);
   };
 
+  const buildLocalStaticHint = (level: number) => {
+    const codeLines = currentCode.trim().split('\n').filter((l) => l.trim() && !l.trim().startsWith('#')).length;
+    if (level === 1) {
+      return `Offline Static Mentor (Objective ${step.targetObjectiveId}):\n• Concept: ${step.breadcrumbs.level1Concept}\n• Your editor currently has ${codeLines} active line(s). Check that your logic matches the step specification before unlocking Level 2 syntax.`;
+    }
+    if (level === 2) {
+      return `Offline Static Mentor (Objective ${step.targetObjectiveId}):\n• Target Syntax Pattern:\n${step.breadcrumbs.level2Syntax}\n• Compare your parameter names and indentation with the pattern above.`;
+    }
+    return `Offline Static Mentor (Objective ${step.targetObjectiveId}):\n• Structural Scaffold:\n${step.breadcrumbs.level3Scaffold}\n• Fill in the placeholders while preserving Python indentation and PCEP corner-case handling.`;
+  };
+
   const handleAskAI = async (level: number) => {
     setAiLoading(true);
     setAiError(null);
@@ -50,14 +61,20 @@ export const BreadcrumbsDrawer: React.FC<BreadcrumbsDrawerProps> = ({
         }),
       });
 
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || !contentType.includes('application/json')) {
+        setAiHint(buildLocalStaticHint(level));
+        return;
+      }
+
       const data = await res.json();
       if (data.hint) {
         setAiHint(data.hint);
       } else {
-        setAiError(data.error || 'Could not generate AI breadcrumb hint');
+        setAiHint(buildLocalStaticHint(level));
       }
-    } catch (err: any) {
-      setAiError(err?.message || 'Server request failed');
+    } catch {
+      setAiHint(buildLocalStaticHint(level));
     } finally {
       setAiLoading(false);
     }

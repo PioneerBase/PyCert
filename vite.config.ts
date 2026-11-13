@@ -3,13 +3,23 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+function normalizeBasePath(rawBase?: string): string {
+  if (!rawBase || rawBase === '/') return '/';
+  const withLeading = rawBase.startsWith('/') ? rawBase : `/${rawBase}`;
+  return withLeading.endsWith('/') ? withLeading : `${withLeading}/`;
+}
+
 export default defineConfig(({ command }) => {
+  const buildBase = process.env.VITE_BASE_PATH
+    ? normalizeBasePath(process.env.VITE_BASE_PATH)
+    : './';
+
   return {
-    base: command === 'build' ? './' : '/',
+    base: command === 'build' ? buildBase : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
     server: {
