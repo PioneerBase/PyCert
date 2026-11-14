@@ -135,7 +135,6 @@ app.get('/api/github/session', (req: Request, res: Response) => {
     configured: isGitHubConfigured(),
     connected: Boolean(found),
     user: found?.session.user || null,
-    callbackUrl: getCallbackUrl(),
   });
 });
 
@@ -146,9 +145,7 @@ app.get('/api/github/auth/url', (_req: Request, res: Response) => {
   if (!isGitHubConfigured()) {
     return res.status(400).json({
       configured: false,
-      callbackUrl,
-      error:
-        'GitHub OAuth credentials (GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET) are not set on the server yet.',
+      error: 'GitHub account linking is not enabled in this environment yet.',
     });
   }
 
@@ -166,7 +163,6 @@ app.get('/api/github/auth/url', (_req: Request, res: Response) => {
 
   res.json({
     url: `https://github.com/login/oauth/authorize?${params.toString()}`,
-    callbackUrl,
   });
 });
 
@@ -231,10 +227,10 @@ const handleOAuthCallback = async (req: Request, res: Response) => {
     return renderPopupResponse(
       {
         type: 'GITHUB_OAUTH_ERROR',
-        error: 'Server GitHub OAuth credentials are missing.',
+        error: 'GitHub account linking is not enabled in this environment.',
       },
-      'Configuration Missing',
-      'GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET must be set on the server.'
+      'Unavailable',
+      'GitHub account linking is not enabled on the server right now.'
     );
   }
 
@@ -619,10 +615,9 @@ Keep response concise, authoritative, and under 120 words. Format cleanly in Mar
       fallback: false,
       hint: hintText,
     });
-  } catch (error: any) {
+  } catch {
     res.status(500).json({
-      error: 'Failed to generate AI breadcrumb',
-      details: error?.message || 'Server error',
+      error: 'Unable to generate AI breadcrumb right now.',
     });
   }
 });
@@ -665,10 +660,9 @@ Keep under 100 words.`;
       fallback: false,
       diagnosis: response.text || 'Check syntax and data types.',
     });
-  } catch (error: any) {
+  } catch {
     res.status(500).json({
-      error: 'Failed to diagnose code error',
-      details: error?.message || 'Server error',
+      error: 'Unable to diagnose code error right now.',
     });
   }
 });

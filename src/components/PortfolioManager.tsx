@@ -164,7 +164,6 @@ export const PortfolioManager: React.FC = () => {
       return '';
     }
   });
-  const [ghCallbackUrl, setGhCallbackUrl] = useState<string>('');
   const [ghRepos, setGhRepos] = useState<GitHubRepo[]>([]);
   const [selectedRepoFullName, setSelectedRepoFullName] = useState<string>('');
   const [isConnectingGh, setIsConnectingGh] = useState<boolean>(false);
@@ -226,10 +225,8 @@ export const PortfolioManager: React.FC = () => {
         configured: boolean;
         connected: boolean;
         user: GitHubUser | null;
-        callbackUrl?: string;
       };
       setGhConfigured(data.configured);
-      if (data.callbackUrl) setGhCallbackUrl(data.callbackUrl);
       if (data.connected && data.user) {
         setGhUser(data.user);
         setAvatarLoadError(false);
@@ -301,11 +298,8 @@ export const PortfolioManager: React.FC = () => {
       const data = (await res.json()) as {
         url?: string;
         configured?: boolean;
-        callbackUrl?: string;
         error?: string;
       };
-
-      if (data.callbackUrl) setGhCallbackUrl(data.callbackUrl);
 
       if (!res.ok || !data.url) {
         setGhConfigured(false);
@@ -314,7 +308,7 @@ export const PortfolioManager: React.FC = () => {
           kind: 'info',
           text:
             data.error ||
-            'GitHub OAuth app credentials are not configured yet on the server.',
+            'GitHub account linking is not enabled in this environment yet.',
         });
         return;
       }
@@ -815,17 +809,14 @@ export const PortfolioManager: React.FC = () => {
                   <span>{isConnectingGh ? 'Waiting for GitHub...' : 'Link GitHub Account'}</span>
                 </button>
 
-                {!ghConfigured && ghCallbackUrl && (
-                  <div className="p-3 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/20 text-[11px] text-[#2C3E50]/85 dark:text-[#BDC3C7] space-y-1.5">
+                {!ghConfigured && (
+                  <div className="p-3 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/20 text-[11px] text-[#2C3E50]/85 dark:text-[#BDC3C7] space-y-1">
                     <div className="font-bold text-amber-900 dark:text-amber-300">
-                      GitHub OAuth Setup Required
+                      GitHub Sync Unavailable
                     </div>
                     <p className="leading-relaxed">
-                      Add <code className="font-mono">GITHUB_CLIENT_ID</code> and <code className="font-mono">GITHUB_CLIENT_SECRET</code> in Secrets with callback URL:
+                      GitHub account linking is not enabled in this environment yet. You can still generate and copy README documentation from your project cards.
                     </p>
-                    <div className="p-1.5 rounded bg-white dark:bg-[#141C24] border border-[#BDC3C7]/60 dark:border-[#2C3E50] font-mono text-[10px] break-all select-all">
-                      {ghCallbackUrl}
-                    </div>
                   </div>
                 )}
               </div>
