@@ -8,6 +8,7 @@ import {
   resetNotebookKernel,
   NotebookCellResult,
 } from '../services/pythonRunner';
+import { downloadIpynbFile } from '../utils/ipynbExporter';
 import { BreadcrumbsDrawer } from './BreadcrumbsDrawer';
 import {
   Play,
@@ -26,6 +27,7 @@ import {
   RefreshCw,
   Terminal,
   Database,
+  Download,
 } from 'lucide-react';
 
 interface CellRuntimeState {
@@ -66,6 +68,7 @@ export const Workspace: React.FC = () => {
   const [copiedCellId, setCopiedCellId] = useState<string | null>(null);
   const [isBreadcrumbsOpen, setIsBreadcrumbsOpen] = useState<boolean>(false);
   const [kernelBannerMsg, setKernelBannerMsg] = useState<string | null>(null);
+  const [justExported, setJustExported] = useState<boolean>(false);
 
   const cellTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
@@ -226,6 +229,13 @@ export const Workspace: React.FC = () => {
     await resetNotebookKernel();
     setCellResults({});
     setKernelBannerMsg('All cells restored to starter code and kernel restarted.');
+  };
+
+  const handleExportIpynb = () => {
+    const filename = downloadIpynbFile(currentProject, cells, getCellCode, cellResults);
+    setJustExported(true);
+    setKernelBannerMsg(`Downloaded ${filename} with your code and Markdown explanations.`);
+    setTimeout(() => setJustExported(false), 2200);
   };
 
   const handleCellKeyDown = (
@@ -415,6 +425,20 @@ export const Workspace: React.FC = () => {
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset Lab</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportIpynb}
+            className="px-3.5 py-2 rounded-lg text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-[#FAF9F5] dark:bg-[#1A2634] hover:bg-[#EBE9DF] dark:hover:bg-[#243342] border border-[#BDC3C7] dark:border-[#2C3E50] transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+            title="Download your current code and Markdown explanations as a Jupyter Notebook (.ipynb)"
+          >
+            {justExported ? (
+              <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            ) : (
+              <Download className="w-3.5 h-3.5" />
+            )}
+            <span>{justExported ? 'Exported .ipynb' : 'Export as .ipynb'}</span>
           </button>
 
           <button

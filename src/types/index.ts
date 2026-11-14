@@ -73,8 +73,10 @@ export interface MicroProject {
   steps: ProjectStep[];
 }
 
+export type BonusTier = 'Easy' | 'Intermediate' | 'Advanced' | 'Cerebral Conquest (Hard Mode)';
+
 export interface BonusProject extends MicroProject {
-  tier: 'Easy' | 'Intermediate' | 'Advanced';
+  tier: BonusTier;
   bonusNumber: number;
   movedFromLab?: string;
 }

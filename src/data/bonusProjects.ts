@@ -1,8 +1,12 @@
-import { BonusProject } from '../types';
+import { BonusProject, BonusTier } from '../types';
+import { EASY_CATALOG_PROJECTS } from './bonusCatalogEasy';
+import { INTERMEDIATE_CATALOG_PROJECTS } from './bonusCatalogIntermediate';
+import { ADVANCED_CATALOG_PROJECTS } from './bonusCatalogAdvanced';
+import { HARD_MODE_CATALOG_PROJECTS } from './bonusCatalogHardMode';
 
-export const BONUS_PROJECTS: BonusProject[] = [
+const CORE_BONUS_PROJECTS: BonusProject[] = [
   // =========================================================================
-  // EASY PROJECTS (4)
+  // CORE EASY PROJECTS (4)
   // =========================================================================
   {
     id: 'bonus-digital-clock',
@@ -1912,3 +1916,26 @@ return "Not quite a vibe."`,
     ],
   },
 ];
+
+const TIER_ORDER: BonusTier[] = [
+  'Easy',
+  'Intermediate',
+  'Advanced',
+  'Cerebral Conquest (Hard Mode)',
+];
+
+const ALL_UNNUMBERED: BonusProject[] = [
+  ...CORE_BONUS_PROJECTS,
+  ...EASY_CATALOG_PROJECTS,
+  ...INTERMEDIATE_CATALOG_PROJECTS,
+  ...ADVANCED_CATALOG_PROJECTS,
+  ...HARD_MODE_CATALOG_PROJECTS,
+];
+
+export const BONUS_PROJECTS: BonusProject[] = TIER_ORDER.flatMap((tier) =>
+  ALL_UNNUMBERED.filter((proj) => proj.tier === tier)
+).map((proj, index) => ({
+  ...proj,
+  bonusNumber: index + 1,
+}));
+

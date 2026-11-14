@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useProgress } from '../context/ProgressContext';
 import { BONUS_PROJECTS } from '../data/bonusProjects';
-import { BonusProject } from '../types';
+import { BonusProject, BonusTier } from '../types';
 import {
   CheckCircle2,
   Code2,
@@ -10,12 +10,14 @@ import {
   Clock,
   ArrowRight,
   Layers,
+  Search,
+  X,
 } from 'lucide-react';
 
-type TierFilter = 'all' | 'Easy' | 'Intermediate' | 'Advanced' | 'selected';
+type TierFilter = 'all' | BonusTier | 'selected';
 
 const TIER_META: Array<{
-  tier: 'Easy' | 'Intermediate' | 'Advanced';
+  tier: BonusTier;
   heading: string;
   subtitle: string;
 }> = [
@@ -23,19 +25,25 @@ const TIER_META: Array<{
     tier: 'Easy',
     heading: 'Easy Projects',
     subtitle:
-      'Foundational Python builds covering digital clocks, binary & unit conversions, Tkinter calculator architecture, and local JSON storage.',
+      'Foundational Python utilities and mini-games: number guessing, odd/even checks, calculators, temperature & binary converters, countdowns, and shopping lists.',
   },
   {
     tier: 'Intermediate',
     heading: 'Intermediate Projects',
     subtitle:
-      'Applied Python projects including the relocated CLI Cipher (formerly Lab 6), JSON weather dashboards, and stateful text-based games.',
+      'Applied Python projects including expense trackers, CLI task managers, file & word frequency analyzers, contact books, question banks, and the relocated CLI Cipher.',
   },
   {
     tier: 'Advanced',
     heading: 'Advanced Projects',
     subtitle:
-      'Portfolio-grade engineering: astronomy sundial trigonometry, blog API & webhook integrations, e-commerce checkout backends, and consumer decision algorithms.',
+      'Structured engineering systems: student gradebooks, library lending, bank & inventory simulators, Sudoku validation, CSV/log pipelines, sundials, and chatbots.',
+  },
+  {
+    tier: 'Cerebral Conquest (Hard Mode)',
+    heading: 'Cerebral Conquest (Hard Mode)',
+    subtitle:
+      'Deep algorithmic and systems challenges: recursive maze backtracking, turn-based roguelikes, multi-file CRUD persistence, regex parsers, strategy AI, spreadsheets, and a mini interpreter.',
   },
 ];
 
@@ -48,9 +56,22 @@ export const BonusProjectsView: React.FC = () => {
   } = useProgress();
 
   const [tierFilter, setTierFilter] = useState<TierFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const selectedProjects = BONUS_PROJECTS.filter((p) =>
-    selectedBonusProjectIds.includes(p.id)
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const matchesSearch = (project: BonusProject) => {
+    if (!normalizedQuery) return true;
+    return (
+      project.title.toLowerCase().includes(normalizedQuery) ||
+      project.description.toLowerCase().includes(normalizedQuery) ||
+      project.tier.toLowerCase().includes(normalizedQuery) ||
+      project.learningOutcomes.some((o) => o.toLowerCase().includes(normalizedQuery))
+    );
+  };
+
+  const selectedProjects = BONUS_PROJECTS.filter(
+    (p) => selectedBonusProjectIds.includes(p.id) && matchesSearch(p)
   );
 
   const totalBonusCompleted = BONUS_PROJECTS.filter((p) => {
@@ -58,8 +79,10 @@ export const BonusProjectsView: React.FC = () => {
     return done >= p.steps.length;
   }).length;
 
-  const getTierProjects = (tier: 'Easy' | 'Intermediate' | 'Advanced') => {
-    return BONUS_PROJECTS.filter((p) => p.tier === tier);
+  const getTierProjects = (tier: BonusTier, applySearch = true) => {
+    return BONUS_PROJECTS.filter(
+      (p) => p.tier === tier && (!applySearch || matchesSearch(p))
+    );
   };
 
   const renderProjectCard = (project: BonusProject) => {
@@ -85,7 +108,15 @@ export const BonusProjectsView: React.FC = () => {
                 Project {project.bonusNumber < 10 ? `0${project.bonusNumber}` : project.bonusNumber}
               </span>
               <span aria-hidden="true">·</span>
-              <span>{project.tier}</span>
+              <span
+                className={
+                  project.tier === 'Cerebral Conquest (Hard Mode)'
+                    ? 'font-bold text-[#5A1827] dark:text-amber-300'
+                    : undefined
+                }
+              >
+                {project.tier}
+              </span>
               {project.movedFromLab && (
                 <>
                   <span aria-hidden="true">·</span>
@@ -185,15 +216,22 @@ export const BonusProjectsView: React.FC = () => {
       ? []
       : TIER_META.filter((t) => t.tier === tierFilter);
 
+  const visibleTierSections = visibleTiers
+    .map((meta) => ({
+      ...meta,
+      projects: getTierProjects(meta.tier, true),
+    }))
+    .filter((section) => !normalizedQuery || section.projects.length > 0);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-in fade-in duration-150">
       {/* Page Header */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-[#BDC3C7]/70 dark:border-[#2C3E50] pb-6">
         <div className="space-y-2 max-w-3xl">
-          <div className="flex items-center gap-2 text-xs font-mono text-[#1E3A78] dark:text-amber-300 font-semibold">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-[#1E3A78] dark:text-amber-300 font-semibold">
             <span>Portfolio Expansion Tracks</span>
             <span aria-hidden="true">·</span>
-            <span>Easy, Intermediate &amp; Advanced</span>
+            <span>Easy, Intermediate, Advanced &amp; Cerebral Conquest (Hard Mode)</span>
             <span aria-hidden="true">·</span>
             <span className="tabular-nums">{BONUS_PROJECTS.length} Hands-On Builds</span>
           </div>
@@ -201,7 +239,7 @@ export const BonusProjectsView: React.FC = () => {
             Bonus Portfolio Projects
           </h1>
           <p className="text-xs sm:text-sm text-[#2C3E50]/85 dark:text-[#BDC3C7] leading-relaxed">
-            Pick bonus projects to build outside the 5 core PCEP syllabus labs—including the CLI Cipher relocated from Lab 6. Select projects to queue them up, then code and verify each step inside the interactive Python notebook.
+            Pick bonus projects to build outside the 5 core PCEP syllabus labs—from beginner utilities up to Cerebral Conquest hard-mode challenges and the CLI Cipher relocated from Lab 6. Select projects to queue them up, then code and verify each step inside the interactive Python notebook.
           </p>
         </div>
 
@@ -222,15 +260,25 @@ export const BonusProjectsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Interactive Tier Filter Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* Interactive Tier Filter & Search Bar */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#FAF9F5] dark:bg-[#141C24] border border-[#BDC3C7]/80 dark:border-[#2C3E50] overflow-x-auto">
           {(
             [
               { id: 'all', label: `All Projects (${BONUS_PROJECTS.length})` },
-              { id: 'Easy', label: `Easy (${getTierProjects('Easy').length})` },
-              { id: 'Intermediate', label: `Intermediate (${getTierProjects('Intermediate').length})` },
-              { id: 'Advanced', label: `Advanced (${getTierProjects('Advanced').length})` },
+              { id: 'Easy', label: `Easy (${getTierProjects('Easy', false).length})` },
+              {
+                id: 'Intermediate',
+                label: `Intermediate (${getTierProjects('Intermediate', false).length})`,
+              },
+              {
+                id: 'Advanced',
+                label: `Advanced (${getTierProjects('Advanced', false).length})`,
+              },
+              {
+                id: 'Cerebral Conquest (Hard Mode)',
+                label: `Cerebral Conquest (${getTierProjects('Cerebral Conquest (Hard Mode)', false).length})`,
+              },
               { id: 'selected', label: `My Selected (${selectedBonusProjectIds.length})` },
             ] as Array<{ id: TierFilter; label: string }>
           ).map((tab) => (
@@ -240,7 +288,9 @@ export const BonusProjectsView: React.FC = () => {
               onClick={() => setTierFilter(tab.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer tabular-nums ${
                 tierFilter === tab.id
-                  ? 'bg-[#1E3A78] text-[#F5F5DC] shadow-xs'
+                  ? tab.id === 'Cerebral Conquest (Hard Mode)'
+                    ? 'bg-[#5A1827] text-[#F5F5DC] shadow-xs'
+                    : 'bg-[#1E3A78] text-[#F5F5DC] shadow-xs'
                   : 'text-[#2C3E50]/80 dark:text-[#BDC3C7] hover:text-[#1E3A78] dark:hover:text-[#F5F5DC]'
               }`}
             >
@@ -249,9 +299,28 @@ export const BonusProjectsView: React.FC = () => {
           ))}
         </div>
 
-        <span className="text-xs font-mono text-[#5D6D7E] dark:text-[#BDC3C7]">
-          Every project runs live in your Jupyter-style Python notebook
-        </span>
+        {/* Search Input */}
+        <div className="relative w-full xl:w-72 shrink-0">
+          <Search className="w-3.5 h-3.5 text-[#5D6D7E] dark:text-[#BDC3C7] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Filter projects by title or skill..."
+            aria-label="Filter bonus projects"
+            className="w-full pl-8 pr-8 py-2 rounded-xl text-xs bg-[#FAF9F5] dark:bg-[#141C24] border border-[#BDC3C7] dark:border-[#2C3E50] text-[#2C3E50] dark:text-[#F5F5DC] placeholder-[#5D6D7E] dark:placeholder-[#BDC3C7]/70 focus:outline-hidden focus:border-[#1E3A78] dark:focus:border-amber-400"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#5D6D7E] hover:text-[#2C3E50] dark:text-[#BDC3C7] dark:hover:text-[#F5F5DC] cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Selected Projects Queue (visible on 'all' when user selected >=1, or when viewing 'selected') */}
@@ -272,10 +341,12 @@ export const BonusProjectsView: React.FC = () => {
           {selectedProjects.length === 0 ? (
             <div className="p-8 rounded-2xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] text-center space-y-2">
               <p className="text-sm font-semibold text-[#2C3E50] dark:text-[#F5F5DC]">
-                No bonus projects selected yet
+                {normalizedQuery
+                  ? 'No selected projects match your search'
+                  : 'No bonus projects selected yet'}
               </p>
               <p className="text-xs text-[#5D6D7E] dark:text-[#BDC3C7]">
-                Click &ldquo;Select&rdquo; on any Easy, Intermediate, or Advanced project below to pin it to your build queue, or click &ldquo;Start Build&rdquo; directly.
+                Click &ldquo;Select&rdquo; on any Easy, Intermediate, Advanced, or Cerebral Conquest project to pin it to your build queue, or click &ldquo;Start Build&rdquo; directly.
               </p>
             </div>
           ) : (
@@ -286,11 +357,26 @@ export const BonusProjectsView: React.FC = () => {
         </section>
       )}
 
-      {/* 3 Difficulty Sections: Easy, Intermediate, Advanced */}
-      <div className="space-y-10">
-        {visibleTiers.map(({ tier, heading, subtitle }) => {
-          const tierProjects = getTierProjects(tier);
-          return (
+      {/* 4 Difficulty Sections: Easy, Intermediate, Advanced, Cerebral Conquest (Hard Mode) */}
+      {tierFilter !== 'selected' && visibleTierSections.length === 0 ? (
+        <div className="p-10 rounded-2xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] text-center space-y-3">
+          <p className="text-sm font-semibold text-[#2C3E50] dark:text-[#F5F5DC]">
+            No bonus projects match &ldquo;{searchQuery}&rdquo;
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery('');
+              setTierFilter('all');
+            }}
+            className="px-3.5 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] cursor-pointer"
+          >
+            Reset Filters
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-10">
+          {visibleTierSections.map(({ tier, heading, subtitle, projects }) => (
             <section key={tier} className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 border-b border-[#BDC3C7]/60 dark:border-[#2C3E50] pb-3">
                 <div className="space-y-1">
@@ -302,17 +388,17 @@ export const BonusProjectsView: React.FC = () => {
                   </p>
                 </div>
                 <span className="text-xs font-mono font-semibold text-[#1E3A78] dark:text-sky-300 tabular-nums shrink-0">
-                  {tierProjects.length} Projects
+                  {projects.length} {projects.length === 1 ? 'Project' : 'Projects'}
                 </span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {tierProjects.map(renderProjectCard)}
+                {projects.map(renderProjectCard)}
               </div>
             </section>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
