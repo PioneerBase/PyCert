@@ -7,6 +7,7 @@ import { Workspace } from './components/Workspace';
 import { FlashcardsView } from './components/FlashcardsView';
 import { ExamSimulator } from './components/ExamSimulator';
 import { PortfolioManager } from './components/PortfolioManager';
+import { BonusProjectsView } from './components/BonusProjectsView';
 import { LoginModal } from './components/LoginModal';
 import { AccountModal } from './components/AccountModal';
 import { DiagnosticExamModal } from './components/DiagnosticExamModal';
@@ -30,6 +31,7 @@ const MainContent: React.FC = () => {
       {activeView === 'portfolio' && <PortfolioManager />}
       {activeView === 'flashcards' && <FlashcardsView />}
       {activeView === 'exam' && <ExamSimulator />}
+      {activeView === 'bonus' && <BonusProjectsView />}
     </main>
   );
 };

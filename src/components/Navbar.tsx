@@ -16,6 +16,7 @@ import {
   Settings,
   HelpCircle,
   User,
+  Rocket,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
@@ -31,6 +32,7 @@ export const Navbar: React.FC = () => {
     setIsAccountModalOpen,
     setIsTourModalOpen,
     readinessPercentage,
+    selectedBonusProjectIds,
   } = useProgress();
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -183,7 +185,7 @@ export const Navbar: React.FC = () => {
 
           <button
             onClick={() => setActiveView('workspace')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
               activeView === 'workspace'
                 ? 'bg-[#1E3A78] text-[#F5F5DC] font-semibold shadow-xs'
                 : 'text-[#2C3E50]/80 dark:text-[#BDC3C7] hover:bg-white/60 dark:hover:bg-[#243342]/60'
@@ -191,18 +193,6 @@ export const Navbar: React.FC = () => {
           >
             <Code2 className="w-3.5 h-3.5" />
             <span>Syllabus Labs (IDE)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveView('guide')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
-              activeView === 'guide'
-                ? 'bg-[#5A1827] text-[#F5F5DC] font-semibold shadow-xs'
-                : 'text-[#2C3E50]/80 dark:text-[#BDC3C7] hover:bg-white/60 dark:hover:bg-[#243342]/60'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Project Guide</span>
           </button>
 
           <button
@@ -239,7 +229,7 @@ export const Navbar: React.FC = () => {
 
           <button
             onClick={() => setActiveView('exam')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
               activeView === 'exam'
                 ? 'bg-[#1E3A78] text-[#F5F5DC] font-semibold shadow-xs'
                 : 'text-[#2C3E50]/80 dark:text-[#BDC3C7] hover:bg-white/60 dark:hover:bg-[#243342]/60'
@@ -247,6 +237,23 @@ export const Navbar: React.FC = () => {
           >
             <Award className="w-3.5 h-3.5" />
             <span>Mock Exam</span>
+          </button>
+
+          <button
+            onClick={() => setActiveView('bonus')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+              activeView === 'bonus'
+                ? 'bg-[#5A1827] text-[#F5F5DC] font-semibold shadow-xs'
+                : 'text-[#2C3E50]/80 dark:text-[#BDC3C7] hover:bg-white/60 dark:hover:bg-[#243342]/60'
+            }`}
+          >
+            <Rocket className="w-3.5 h-3.5" />
+            <span>Bonus Projects</span>
+            {selectedBonusProjectIds.length > 0 && (
+              <span className="text-[10px] font-mono opacity-85 tabular-nums">
+                ({selectedBonusProjectIds.length})
+              </span>
+            )}
           </button>
         </nav>
 

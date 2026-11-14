@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { MicroProject, Flashcard, ChecklistItem, UserProgressState, UserProfile, StreakData } from '../types';
 import { MICRO_PROJECTS, INITIAL_FLASHCARDS, INITIAL_CHECKLIST_ITEMS } from '../data/pcepCurriculum';
+import { BONUS_PROJECTS } from '../data/bonusProjects';
 
-export type AppView = 'home' | 'curriculum' | 'workspace' | 'guide' | 'flashcards' | 'exam' | 'portfolio';
+export type AppView = 'home' | 'curriculum' | 'workspace' | 'flashcards' | 'exam' | 'portfolio' | 'bonus';
 
 interface ProgressContextType {
   activeView: AppView;
@@ -50,6 +51,8 @@ interface ProgressContextType {
   currentStreak: number;
   longestStreak: number;
   hasPracticedToday: boolean;
+  selectedBonusProjectIds: string[];
+  toggleBonusProjectSelection: (projectId: string) => void;
 }
 
 const STORAGE_KEY = 'pycert_user_progress_v1';
@@ -118,6 +121,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [completedStepsMap, setCompletedStepsMap] = useState<Record<string, number[]>>({});
   const [codeSnapshots, setCodeSnapshots] = useState<Record<string, string>>({});
   const [cellSnapshots, setCellSnapshots] = useState<Record<string, Record<string, string>>>({});
+  const [selectedBonusProjectIds, setSelectedBonusProjectIds] = useState<string[]>([]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>(INITIAL_FLASHCARDS);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(INITIAL_CHECKLIST_ITEMS);
   const [quizHistory, setQuizHistory] = useState<UserProgressState['quizHistory']>([]);
@@ -146,8 +150,10 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.completedStepsMap) {
-          // Clean up any removed project IDs (e.g., old proj-03-caesar-cipher)
-          const validIds = new Set(MICRO_PROJECTS.map((p) => p.id));
+          const validIds = new Set([
+            ...MICRO_PROJECTS.map((p) => p.id),
+            ...BONUS_PROJECTS.map((p) => p.id),
+          ]);
           const cleanedStepsMap: Record<string, number[]> = {};
           Object.entries(parsed.completedStepsMap).forEach(([k, v]) => {
             if (validIds.has(k) && Array.isArray(v)) {
@@ -155,6 +161,12 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
           });
           setCompletedStepsMap(cleanedStepsMap);
+        }
+        if (Array.isArray(parsed.selectedBonusProjectIds)) {
+          const validBonusIds = new Set(BONUS_PROJECTS.map((p) => p.id));
+          setSelectedBonusProjectIds(
+            parsed.selectedBonusProjectIds.filter((id: string) => validBonusIds.has(id))
+          );
         }
         if (parsed.codeSnapshots && parsed.curriculumVersion === CURRICULUM_VERSION) {
           setCodeSnapshots(parsed.codeSnapshots);
@@ -210,6 +222,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           completedStepsMap,
           codeSnapshots,
           cellSnapshots,
+          selectedBonusProjectIds,
           flashcards,
           checklistItems,
           quizHistory,
@@ -221,7 +234,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (e) {
       console.warn('Failed to save progress to localStorage', e);
     }
-  }, [completedStepsMap, codeSnapshots, cellSnapshots, flashcards, checklistItems, quizHistory, darkMode, currentUser, streakData]);
+  }, [completedStepsMap, codeSnapshots, cellSnapshots, selectedBonusProjectIds, flashcards, checklistItems, quizHistory, darkMode, currentUser, streakData]);
 
   // Keep dark class on documentElement
   useEffect(() => {
@@ -232,8 +245,9 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [darkMode]);
 
+  const allProjects = [...MICRO_PROJECTS, ...BONUS_PROJECTS];
   const currentProject =
-    MICRO_PROJECTS.find((p) => p.id === selectedProjectId) || MICRO_PROJECTS[0];
+    allProjects.find((p) => p.id === selectedProjectId) || MICRO_PROJECTS[0];
 
   const getCellCode = (cellId: string): string => {
     const saved = cellSnapshots[selectedProjectId]?.[cellId];
@@ -424,12 +438,21 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Dynamic readiness score calculation: starts at 0% for new users!
   const totalPossibleSteps = MICRO_PROJECTS.reduce((acc, p) => acc + p.steps.length, 0);
-  const totalCompletedSteps = Object.values(completedStepsMap).reduce((acc, steps) => acc + steps.length, 0);
+  const totalCompletedSteps = MICRO_PROJECTS.reduce(
+    (acc, p) => acc + (completedStepsMap[p.id]?.length || 0),
+    0
+  );
   const labReadiness = totalPossibleSteps > 0 ? (totalCompletedSteps / totalPossibleSteps) * 60 : 0;
   const quizReadiness = quizHistory.length > 0
     ? (quizHistory.reduce((acc, q) => acc + q.percentage, 0) / (quizHistory.length * 100)) * 40
     : 0;
   const readinessPercentage = Math.min(100, Math.round(labReadiness + quizReadiness));
+
+  const toggleBonusProjectSelection = (projectId: string) => {
+    setSelectedBonusProjectIds((prev) =>
+      prev.includes(projectId) ? prev.filter((id) => id !== projectId) : [...prev, projectId]
+    );
+  };
 
   const updateUserProfile = (updates: Partial<UserProfile>) => {
     setCurrentUser((prev) => {
@@ -452,6 +475,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setCompletedStepsMap({});
     setCodeSnapshots({});
     setCellSnapshots({});
+    setSelectedBonusProjectIds([]);
     setFlashcards(INITIAL_FLASHCARDS);
     setChecklistItems(INITIAL_CHECKLIST_ITEMS);
     setQuizHistory([]);
@@ -464,6 +488,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           completedStepsMap: {},
           codeSnapshots: {},
           cellSnapshots: {},
+          selectedBonusProjectIds: [],
           flashcards: INITIAL_FLASHCARDS,
           checklistItems: INITIAL_CHECKLIST_ITEMS,
           quizHistory: [],
@@ -598,6 +623,8 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           computeStreak(streakData.activityHistory).currentStreak
         ),
         hasPracticedToday: computeStreak(streakData.activityHistory).hasPracticedToday,
+        selectedBonusProjectIds,
+        toggleBonusProjectSelection,
       }}
     >
       {children}

@@ -73,6 +73,12 @@ export interface MicroProject {
   steps: ProjectStep[];
 }
 
+export interface BonusProject extends MicroProject {
+  tier: 'Easy' | 'Intermediate' | 'Advanced';
+  bonusNumber: number;
+  movedFromLab?: string;
+}
+
 export interface Flashcard {
   id: string;
   pcepSection: 1 | 2 | 3 | 4 | 5;

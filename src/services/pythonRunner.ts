@@ -498,6 +498,9 @@ function simulateNotebookCell(
         checkPassed = b3.includes('caesar_cipher(') && b3.includes('-shift');
         checkMsg = checkPassed ? 'Step check passed!' : 'Return caesar_cipher(text, -shift) inside decode_cipher';
       }
+    } else if (combinedCode.includes('def format_24h') || combinedCode.includes('def decimal_to_binary') || combinedCode.includes('def calculate') || combinedCode.includes('def add_task') || combinedCode.includes('def comfort_tier') || combinedCode.includes('def create_player') || combinedCode.includes('def solar_hour_angle') || combinedCode.includes('def create_post') || combinedCode.includes('def add_to_cart') || combinedCode.includes('def compute_vibe_score')) {
+      checkPassed = !code.includes('# TODO') && !code.includes('return ""\n') && !code.includes('return {}\n') && !code.includes('return 0.0\n');
+      checkMsg = checkPassed ? 'Step check passed!' : 'Replace the # TODO placeholder with your implementation and re-run.';
     }
   }
 

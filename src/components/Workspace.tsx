@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useProgress } from '../context/ProgressContext';
 import { MICRO_PROJECTS } from '../data/pcepCurriculum';
+import { BONUS_PROJECTS } from '../data/bonusProjects';
 import { KernelVariable, NotebookCell, ProjectStep } from '../types';
 import {
   executeNotebookCell,
@@ -285,6 +286,7 @@ export const Workspace: React.FC = () => {
   const totalSteps = currentProject.steps.length;
   const progressPct = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
 
+  const activeBonus = BONUS_PROJECTS.find((b) => b.id === currentProject.id);
   const currentLabIdx = MICRO_PROJECTS.findIndex((p) => p.id === currentProject.id);
   const nextLab =
     currentLabIdx >= 0 && currentLabIdx < MICRO_PROJECTS.length - 1
@@ -324,12 +326,45 @@ export const Workspace: React.FC = () => {
         </div>
       </div>
 
+      {/* Active Bonus Project Context Bar (when building a Bonus Project) */}
+      {activeBonus && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-[#FAF9F5] dark:bg-[#141C24] border border-[#1E3A78]/40 dark:border-amber-400/40 text-xs">
+          <div className="flex items-center gap-2 flex-wrap font-mono">
+            <span className="font-bold text-[#5A1827] dark:text-amber-300">
+              Bonus Project ({activeBonus.tier})
+            </span>
+            <span aria-hidden="true">·</span>
+            <span className="font-semibold text-[#2C3E50] dark:text-[#F5F5DC]">
+              {activeBonus.title}
+            </span>
+            {activeBonus.movedFromLab && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="text-[#5D6D7E] dark:text-[#BDC3C7]">
+                  Formerly {activeBonus.movedFromLab}
+                </span>
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveView('bonus')}
+            className="font-semibold text-[#1E3A78] dark:text-sky-300 hover:underline inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+          >
+            <span>Browse All Bonus Projects</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Notebook Header & Shared Kernel Controls */}
       <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap text-xs font-mono text-[#1E3A78] dark:text-[#BDC3C7]">
             <span className="font-bold">
-              Domain {currentProject.sectionNumber}: {currentProject.sectionName}
+              {activeBonus
+                ? `Bonus Project ${activeBonus.bonusNumber < 10 ? `0${activeBonus.bonusNumber}` : activeBonus.bonusNumber} (${activeBonus.tier})`
+                : `Domain ${currentProject.sectionNumber}: ${currentProject.sectionName}`}
             </span>
             <span aria-hidden="true">·</span>
             <span>Objectives {currentProject.specificObjectives.join(', ')}</span>
@@ -855,7 +890,16 @@ export const Workspace: React.FC = () => {
               <span>Open Portfolio</span>
             </button>
 
-            {nextLab && (
+            {activeBonus ? (
+              <button
+                type="button"
+                onClick={() => setActiveView('bonus')}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <span>Back to Bonus Projects</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            ) : nextLab ? (
               <button
                 type="button"
                 onClick={() => selectProject(nextLab.id)}
@@ -864,7 +908,7 @@ export const Workspace: React.FC = () => {
                 <span>Next: {nextLab.title.split(':')[0].split('(')[0].trim()}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       )}
