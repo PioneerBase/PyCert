@@ -177,6 +177,7 @@ export interface UserProfile {
   targetExamDate?: string;
   studyPace?: 'relaxed' | 'standard' | 'intensive';
   hasSeenTour?: boolean;
+  hasDismissedWelcome?: boolean;
   diagnosticResult?: {
     score: number;
     total: number;

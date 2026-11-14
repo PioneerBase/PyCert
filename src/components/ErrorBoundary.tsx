@@ -7,7 +7,6 @@ interface ErrorBoundaryProps {
 
 interface ErrorBoundaryState {
   hasError: boolean;
-  errorMessage: string;
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -15,19 +14,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     super(props);
     this.state = {
       hasError: false,
-      errorMessage: '',
     };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(): ErrorBoundaryState {
     return {
       hasError: true,
-      errorMessage: error?.message || 'An unexpected rendering error occurred.',
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('PyCert ErrorBoundary caught an error:', error, errorInfo);
+  componentDidCatch(_error: Error, _errorInfo: ErrorInfo) {
+    // Handled gracefully by recovery UI
   }
 
   handleReload = () => {
@@ -54,16 +51,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               </div>
               <div className="space-y-1">
                 <h1 className="text-lg font-bold text-[#1E3A78]">
-                  PyCert Recovery Mode
+                  Something went wrong
                 </h1>
                 <p className="text-xs text-[#5D6D7E] leading-relaxed">
-                  The application encountered a runtime issue while rendering. You can reload the page or clear cached session progress to restore a clean state.
+                  We ran into an unexpected issue displaying this screen. Reload the page to continue, or reset your cached session data if the issue persists.
                 </p>
               </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-[#141C24] text-[#F5F5DC] font-mono text-xs overflow-x-auto border border-[#2C3E50]">
-              {this.state.errorMessage}
             </div>
 
             <div className="flex flex-wrap items-center gap-3 pt-1">

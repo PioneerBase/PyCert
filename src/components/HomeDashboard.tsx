@@ -1,29 +1,24 @@
 import React, { useState } from 'react';
 import { useProgress } from '../context/ProgressContext';
-import { PCEP_SECTIONS, MICRO_PROJECTS } from '../data/pcepCurriculum';
+import { MICRO_PROJECTS } from '../data/pcepCurriculum';
 import { GitReadmeModal } from './GitReadmeModal';
 import { DailyStreakTracker } from './DailyStreakTracker';
 import {
-  Sparkles,
   Calendar,
   Flame,
   Award,
   Clock,
-  BookOpen,
   ArrowRight,
   Code2,
   CheckCircle2,
-  GitBranch,
   FileText,
-  RotateCcw,
-  Check,
-  ChevronRight,
-  Maximize2,
-  Settings,
-  RefreshCw,
   Compass,
   HelpCircle,
-  User,
+  Settings,
+  Rocket,
+  Layers,
+  BookOpen,
+  X,
 } from 'lucide-react';
 
 export const HomeDashboard: React.FC = () => {
@@ -32,16 +27,21 @@ export const HomeDashboard: React.FC = () => {
     selectProject,
     currentProject,
     currentUser,
+    updateUserProfile,
     completedStepsMap,
     readinessPercentage,
     setIsDiagnosticModalOpen,
     setIsTourModalOpen,
     setIsAccountModalOpen,
     currentStreak,
+    flashcards,
+    reviewFlashcard,
+    quizHistory,
+    selectedBonusProjectIds,
   } = useProgress();
   const [isReadmeModalOpen, setIsReadmeModalOpen] = useState<boolean>(false);
   const [flashcardRevealed, setFlashcardRevealed] = useState<boolean>(false);
-  const [flashcardMastered, setFlashcardMastered] = useState<boolean | null>(null);
+  const [flashcardOffset, setFlashcardOffset] = useState<number>(0);
 
   // Calculate dynamic days remaining from user's target exam date
   const targetDate = currentUser.targetExamDate
@@ -50,14 +50,37 @@ export const HomeDashboard: React.FC = () => {
   const diffTime = targetDate.getTime() - Date.now();
   const daysRemaining = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-  // Dynamic user streak: 0 days for fresh users until they complete tasks
-  const totalCompletedTasks = Object.values(completedStepsMap).reduce(
-    (acc, steps) => acc + steps.length,
+  // Real progress totals across all 5 syllabus labs
+  const totalLabSteps = MICRO_PROJECTS.reduce((acc, p) => acc + p.steps.length, 0);
+  const totalCompletedTasks = MICRO_PROJECTS.reduce(
+    (acc, p) => acc + (completedStepsMap[p.id]?.length || 0),
     0
   );
-  const streakDays = totalCompletedTasks > 0 ? 1 : 0;
+  const completedLabsCount = MICRO_PROJECTS.filter(
+    (p) => (completedStepsMap[p.id]?.length || 0) >= p.steps.length
+  ).length;
+  const nextIncompleteLab =
+    MICRO_PROJECTS.find((p) => (completedStepsMap[p.id]?.length || 0) < p.steps.length) ||
+    MICRO_PROJECTS[0];
 
-  // Dynamic domain progress metrics: starts at 0% for new users!
+  const isFirstTimeUser = !currentUser.hasDismissedWelcome;
+  const firstName = currentUser.name ? currentUser.name.split(' ')[0] : 'Candidate';
+
+  // Live flashcard from user's real Leitner study deck
+  const todayStr = new Date().toISOString().split('T')[0];
+  const dueCards = flashcards.filter((c) => c.nextReviewDate <= todayStr);
+  const activeDeck = dueCards.length > 0 ? dueCards : flashcards;
+  const safeIndex = activeDeck.length > 0 ? flashcardOffset % activeDeck.length : 0;
+  const activeCard = activeDeck[safeIndex];
+
+  const handleReviewHomeCard = (gotRight: boolean) => {
+    if (!activeCard) return;
+    reviewFlashcard(activeCard.id, gotRight);
+    setFlashcardRevealed(false);
+    setFlashcardOffset((prev) => prev + 1);
+  };
+
+  // Dynamic domain progress metrics: starts at 0% for new users
   const getDomainMetrics = (domainNum: number) => {
     const domainProjects = MICRO_PROJECTS.filter((p) => p.sectionNumber === domainNum);
     const totalSteps = domainProjects.reduce((acc, p) => acc + p.steps.length, 0);
@@ -84,67 +107,47 @@ export const HomeDashboard: React.FC = () => {
     {
       num: 1,
       title: 'Computer Programming & Fundamentals',
-      desc: 'Literals, variables, comments, numerical operators, type casting, console I/O...',
+      desc: 'Literals, variables, comments, numerical operators, type casting, console I/O.',
       progress: domain1.pct,
-      badgeText: domain1.pct === 0 ? '0% Ready to Start' : `${domain1.pct}% In Progress`,
-      badgeColor:
-        domain1.pct > 0
-          ? 'text-emerald-700 bg-emerald-100/80 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
-          : 'text-[#2C3E50]/70 bg-[#EBE9DF] dark:bg-[#1A2634] dark:text-[#BDC3C7] border-[#BDC3C7]/60 dark:border-[#2C3E50]',
-      footerLeft: `${domain1.completedSteps} of ${domain1.totalSteps} tasks`,
-      footerRight: `${domain1.projectsCount} projects`,
+      statusText: domain1.pct === 0 ? 'Not Started' : domain1.pct === 100 ? 'Complete' : `${domain1.pct}%`,
+      footerLeft: `${domain1.completedSteps} of ${domain1.totalSteps} steps`,
+      footerRight: `${domain1.projectsCount} lab`,
     },
     {
       num: 2,
       title: 'Control Flow: Decisions & Loops',
-      desc: 'Conditional execution, if-elif-else branches, while & for loops, walrus operator...',
+      desc: 'Conditional execution, if-elif-else branches, while & for loops, break & continue.',
       progress: domain2.pct,
-      badgeText: domain2.pct === 0 ? '0% Not Started' : `${domain2.pct}% In Progress`,
-      badgeColor:
-        domain2.pct > 0
-          ? 'text-amber-800 bg-amber-100/80 dark:bg-amber-950/40 dark:text-amber-400 border-amber-300 dark:border-amber-800'
-          : 'text-[#2C3E50]/70 bg-[#EBE9DF] dark:bg-[#1A2634] dark:text-[#BDC3C7] border-[#BDC3C7]/60 dark:border-[#2C3E50]',
-      footerLeft: `${domain2.completedSteps} of ${domain2.totalSteps} tasks`,
-      footerRight: `${domain2.projectsCount} project`,
+      statusText: domain2.pct === 0 ? 'Not Started' : domain2.pct === 100 ? 'Complete' : `${domain2.pct}%`,
+      footerLeft: `${domain2.completedSteps} of ${domain2.totalSteps} steps`,
+      footerRight: `${domain2.projectsCount} lab`,
     },
     {
       num: 3,
       title: 'Data Collections: Lists, Tuples & Dicts',
-      desc: 'Slicing, indexing, immutability concepts, list methods, string algorithms...',
+      desc: 'Slicing, indexing, immutability concepts, list methods, string formatting.',
       progress: domain3.pct,
-      badgeText: domain3.pct === 0 ? '0% Not Started' : `${domain3.pct}% Active`,
-      badgeColor:
-        domain3.pct > 0
-          ? 'text-[#1E3A78] bg-[#1E3A78]/10 dark:bg-[#1E3A78]/30 dark:text-[#F5F5DC] border-[#1E3A78]/30 dark:border-[#BDC3C7]/40'
-          : 'text-[#2C3E50]/70 bg-[#EBE9DF] dark:bg-[#1A2634] dark:text-[#BDC3C7] border-[#BDC3C7]/60 dark:border-[#2C3E50]',
-      footerLeft: `${domain3.completedSteps} of ${domain3.totalSteps} tasks`,
-      footerRight: `${domain3.projectsCount} project`,
+      statusText: domain3.pct === 0 ? 'Not Started' : domain3.pct === 100 ? 'Complete' : `${domain3.pct}%`,
+      footerLeft: `${domain3.completedSteps} of ${domain3.totalSteps} steps`,
+      footerRight: `${domain3.projectsCount} lab`,
     },
     {
       num: 4,
       title: 'Functions, Scopes & Exceptions',
-      desc: 'def statements, positional vs keyword arguments, NoneType, try-except blocks...',
+      desc: 'def statements, positional vs keyword arguments, NoneType, try-except blocks.',
       progress: domain4.pct,
-      badgeText: domain4.pct === 0 ? '0% High Weight' : `${domain4.pct}% Priority`,
-      badgeColor:
-        domain4.pct > 0
-          ? 'text-[#5A1827] bg-[#5A1827]/10 dark:bg-[#5A1827]/30 dark:text-[#F5F5DC] border-[#5A1827]/30'
-          : 'text-[#2C3E50]/70 bg-[#EBE9DF] dark:bg-[#1A2634] dark:text-[#BDC3C7] border-[#BDC3C7]/60 dark:border-[#2C3E50]',
-      footerLeft: `${domain4.completedSteps} of ${domain4.totalSteps} tasks`,
-      footerRight: 'High exam weight',
+      statusText: domain4.pct === 0 ? 'Not Started' : domain4.pct === 100 ? 'Complete' : `${domain4.pct}%`,
+      footerLeft: `${domain4.completedSteps} of ${domain4.totalSteps} steps`,
+      footerRight: '20% exam weight',
     },
     {
       num: 5,
       title: 'File Handling & Module Imports',
-      desc: 'Text file modes (r/w/a), context managers (with open), CSV processing, math and random modules...',
+      desc: 'CSV parsing, context managers, math and random standard library modules.',
       progress: domain5.pct,
-      badgeText: domain5.pct === 0 ? '0% Capstone' : `${domain5.pct}% Verified`,
-      badgeColor:
-        domain5.pct > 0
-          ? 'text-emerald-700 bg-emerald-100/80 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
-          : 'text-[#2C3E50]/70 bg-[#EBE9DF] dark:bg-[#1A2634] dark:text-[#BDC3C7] border-[#BDC3C7]/60 dark:border-[#2C3E50]',
-      footerLeft: `${domain5.completedSteps} of ${domain5.totalSteps} tasks`,
-      footerRight: `${domain5.projectsCount} project`,
+      statusText: domain5.pct === 0 ? 'Not Started' : domain5.pct === 100 ? 'Complete' : `${domain5.pct}%`,
+      footerLeft: `${domain5.completedSteps} of ${domain5.totalSteps} steps`,
+      footerRight: `${domain5.projectsCount} lab`,
     },
   ];
 
@@ -162,62 +165,200 @@ export const HomeDashboard: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-8 animate-in fade-in duration-200">
-      {/* Top Welcome Hero Banner */}
+      {/* First-Time User Welcome Banner */}
+      {isFirstTimeUser && (
+        <section
+          aria-label="Welcome to PyCert 30-03"
+          className="rounded-2xl border border-[#1E3A78]/35 dark:border-amber-400/35 bg-[#FAF9F5] dark:bg-[#1E2936] p-6 sm:p-8 shadow-xs space-y-6"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2 max-w-3xl">
+              <div className="text-xs font-mono font-semibold text-[#5A1827] dark:text-amber-300">
+                First-Time Welcome · Getting Started
+              </div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#2C3E50] dark:text-[#F5F5DC] tracking-tight text-balance">
+                Welcome to PyCert 30-03, {firstName}
+              </h2>
+              <p className="text-xs sm:text-sm text-[#2C3E50]/85 dark:text-[#BDC3C7] leading-relaxed">
+                PyCert 30-03 is a hands-on Python learning studio built for the Python Institute PCEP-30-03 certification. Instead of just reading slides, you write and run real Python step by step inside your browser—with zero setup.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => updateUserProfile({ hasDismissedWelcome: true })}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#5D6D7E] dark:text-[#BDC3C7] hover:text-[#2C3E50] dark:hover:text-[#F5F5DC] hover:bg-[#EBE9DF] dark:hover:bg-[#243342] transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
+              title="Dismiss welcome guide"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Dismiss</span>
+            </button>
+          </div>
+
+          {/* Main Features Overview */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div className="p-4 rounded-xl border border-[#BDC3C7]/70 dark:border-[#2C3E50] bg-white dark:bg-[#141C24] space-y-1.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-[#1E3A78] dark:text-[#F5F5DC]">
+                <Code2 className="w-4 h-4 text-[#5A1827] dark:text-amber-400 shrink-0" />
+                <span>Jupyter-Style Syllabus Labs</span>
+              </div>
+              <p className="text-xs text-[#2C3E50]/75 dark:text-[#BDC3C7] leading-relaxed">
+                5 core coding labs covering every PCEP objective cell by cell, with Worked Patterns, live variable previews, and .ipynb export.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-[#BDC3C7]/70 dark:border-[#2C3E50] bg-white dark:bg-[#141C24] space-y-1.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-[#1E3A78] dark:text-[#F5F5DC]">
+                <Rocket className="w-4 h-4 text-[#5A1827] dark:text-amber-400 shrink-0" />
+                <span>51 Bonus Projects</span>
+              </div>
+              <p className="text-xs text-[#2C3E50]/75 dark:text-[#BDC3C7] leading-relaxed">
+                Practice with optional portfolio challenges across Easy, Intermediate, Advanced, and Cerebral Conquest (Hard Mode).
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-[#BDC3C7]/70 dark:border-[#2C3E50] bg-white dark:bg-[#141C24] space-y-1.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-[#1E3A78] dark:text-[#F5F5DC]">
+                <Layers className="w-4 h-4 text-[#5A1827] dark:text-amber-400 shrink-0" />
+                <span>Flashcards &amp; Mock Exam</span>
+              </div>
+              <p className="text-xs text-[#2C3E50]/75 dark:text-[#BDC3C7] leading-relaxed">
+                Lock in syntax rules using spaced-repetition flashcards and test your readiness with a timed 45-minute exam simulator.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-[#BDC3C7]/70 dark:border-[#2C3E50] bg-white dark:bg-[#141C24] space-y-1.5">
+              <div className="flex items-center gap-2 text-xs font-bold text-[#1E3A78] dark:text-[#F5F5DC]">
+                <BookOpen className="w-4 h-4 text-[#5A1827] dark:text-amber-400 shrink-0" />
+                <span>Portfolio &amp; Export</span>
+              </div>
+              <p className="text-xs text-[#2C3E50]/75 dark:text-[#BDC3C7] leading-relaxed">
+                Turn completed labs into shareable work with README.md templates, .gitignore configs, and standard Jupyter .ipynb downloads.
+              </p>
+            </div>
+          </div>
+
+          {/* Where to Start */}
+          <div className="pt-4 border-t border-[#BDC3C7]/50 dark:border-[#2C3E50] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="text-xs font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
+                Where to Start
+              </div>
+              <p className="text-xs text-[#2C3E50]/80 dark:text-[#BDC3C7]">
+                1. Take the 5-question Diagnostic (optional) or jump straight into <strong className="text-[#1E3A78] dark:text-[#F5F5DC]">{currentProject.title}</strong>. 2. Run one cell at a time with Shift+Enter. 3. Review flashcards daily.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleLaunchFeaturedLab}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#5A1827] hover:bg-[#48121E] shadow-xs transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <Code2 className="w-3.5 h-3.5" />
+                <span>Start First Lab</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsDiagnosticModalOpen(true)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] shadow-xs transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span>Take 5-Question Diagnostic</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsTourModalOpen(true)}
+                className="px-3.5 py-2 rounded-lg text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-white dark:bg-[#141C24] border border-[#BDC3C7] dark:border-[#2C3E50] hover:bg-[#EBE9DF] dark:hover:bg-[#243342] transition-colors inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+              >
+                <HelpCircle className="w-3.5 h-3.5 text-[#1E3A78] dark:text-amber-300" />
+                <span>Quick Feature Tour</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Main Hero Overview */}
       <div className="rounded-2xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] p-6 sm:p-8 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative overflow-hidden">
         <div className="space-y-4 max-w-2xl z-10">
-          {/* Status Badges */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-md text-[11px] font-mono font-bold tracking-wider uppercase bg-[#5A1827] text-[#F5F5DC] shadow-xs">
-              PCEP-30-03 TARGET
+          {/* Clean unboxed metadata row */}
+          <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-[#2C3E50]/80 dark:text-[#BDC3C7]">
+            <span className="font-bold text-[#5A1827] dark:text-amber-300">
+              PCEP-30-03
             </span>
-            <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-[#EBE9DF] dark:bg-[#1A2634] text-[#2C3E50] dark:text-[#BDC3C7] border border-[#BDC3C7]/60 dark:border-[#2C3E50]">
+            <span aria-hidden="true">·</span>
+            <span className="inline-flex items-center gap-1 tabular-nums">
               <Calendar className="w-3.5 h-3.5 text-[#1E3A78] dark:text-[#BDC3C7]" />
-              <span>{daysRemaining} Days Remaining</span>
+              <span>{daysRemaining} Days to Exam Target</span>
             </span>
-            <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold bg-[#EBE9DF] dark:bg-[#1A2634] text-amber-700 dark:text-amber-400 border border-[#BDC3C7]/60 dark:border-[#2C3E50]">
-              <Flame className={`w-3.5 h-3.5 ${currentStreak > 0 ? 'fill-amber-500 text-amber-500' : 'text-slate-400'}`} />
+            <span aria-hidden="true">·</span>
+            <span className="inline-flex items-center gap-1 tabular-nums text-amber-700 dark:text-amber-400 font-semibold">
+              <Flame className={`w-3.5 h-3.5 ${currentStreak > 0 ? 'fill-amber-500 text-amber-500' : 'text-[#7F8C8D]'}`} />
               <span>{currentStreak} {currentStreak === 1 ? 'Day' : 'Days'} Streak</span>
             </span>
+            {currentUser.hasDismissedWelcome && (
+              <>
+                <span aria-hidden="true">·</span>
+                <button
+                  type="button"
+                  onClick={() => updateUserProfile({ hasDismissedWelcome: false })}
+                  className="text-[#1E3A78] dark:text-sky-300 hover:underline font-semibold cursor-pointer"
+                >
+                  Show Welcome Guide
+                </button>
+              </>
+            )}
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#2C3E50] dark:text-[#F5F5DC] tracking-tight flex items-center gap-2">
-              <span>Welcome back, {currentUser.name ? currentUser.name.split(' ')[0] : 'Candidate'}!</span>
-              <span className="text-xl">🎯</span>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#2C3E50] dark:text-[#F5F5DC] tracking-tight text-balance">
+              {totalCompletedTasks === 0 && quizHistory.length === 0
+                ? `Ready to build, ${firstName}`
+                : `Welcome back, ${firstName}`}
             </h1>
             <p className="text-xs sm:text-sm text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed">
-              You're pacing ahead of 84% of fellow candidates. Complete your{' '}
-              <strong className="text-[#1E3A78] dark:text-[#F5F5DC] font-semibold">
-                Section 4: Functions & Exceptions
-              </strong>{' '}
-              drill today to bring study readiness above the 80% passing safety threshold.
+              {totalCompletedTasks === 0 && quizHistory.length === 0 ? (
+                <>
+                  Your workspace starts at <strong className="text-[#1E3A78] dark:text-[#F5F5DC]">0%</strong> so every point reflects verified code you write. Open{' '}
+                  <strong className="text-[#1E3A78] dark:text-[#F5F5DC]">{currentProject.title}</strong> or take the diagnostic to begin.
+                </>
+              ) : (
+                <>
+                  You have passed <strong className="text-[#1E3A78] dark:text-[#F5F5DC] tabular-nums">{totalCompletedTasks} of {totalLabSteps}</strong> syllabus lab steps across{' '}
+                  <strong className="text-[#1E3A78] dark:text-[#F5F5DC] tabular-nums">{completedLabsCount} of 5</strong> domains. Continue with{' '}
+                  <strong className="text-[#1E3A78] dark:text-[#F5F5DC]">{nextIncompleteLab.title}</strong> to raise your readiness toward the 70% passing threshold.
+                </>
+              )}
             </p>
           </div>
 
           {/* Quick Action CTAs */}
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <button
-              onClick={() => setActiveView('flashcards')}
-              className="px-4 py-2.5 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#5A1827] hover:bg-[#48121E] dark:bg-[#6B1D2F] dark:hover:bg-[#541624] shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+              onClick={() => setActiveView('workspace')}
+              className="px-4 py-2.5 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#5A1827] hover:bg-[#48121E] dark:bg-[#6B1D2F] dark:hover:bg-[#541624] shadow-xs transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap"
             >
-              <Award className="w-4 h-4" />
-              <span>Launch Daily Flashcard Drill</span>
+              <Code2 className="w-4 h-4" />
+              <span>Open Syllabus Labs</span>
             </button>
 
             <button
-              onClick={() => setActiveView('workspace')}
-              className="px-4 py-2.5 rounded-lg text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-[#EBE9DF] dark:bg-[#1A2634] hover:bg-[#DFDDD0] dark:hover:bg-[#1E2936] border border-[#BDC3C7] dark:border-[#2C3E50] shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+              onClick={() => setActiveView('flashcards')}
+              className="px-4 py-2.5 rounded-lg text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-[#EBE9DF] dark:bg-[#1A2634] hover:bg-[#DFDDD0] dark:hover:bg-[#1E2936] border border-[#BDC3C7] dark:border-[#2C3E50] shadow-xs transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap"
             >
-              <Code2 className="w-4 h-4 text-[#1E3A78] dark:text-[#BDC3C7]" />
-              <span>Create Syllabus Project</span>
+              <Award className="w-4 h-4 text-[#1E3A78] dark:text-[#BDC3C7]" />
+              <span>Practice Flashcards</span>
             </button>
 
             <button
               onClick={() => setActiveView('exam')}
-              className="px-4 py-2.5 rounded-lg text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-[#FAF9F5] dark:bg-[#243342] hover:bg-[#EBE9DF] dark:hover:bg-[#1A2634] border border-[#BDC3C7] dark:border-[#2C3E50] shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+              className="px-4 py-2.5 rounded-lg text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-white dark:bg-[#243342] hover:bg-[#EBE9DF] dark:hover:bg-[#1A2634] border border-[#BDC3C7] dark:border-[#2C3E50] shadow-xs transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap"
             >
               <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-              <span>Take 45-min Mock Exam</span>
+              <span>45-min Mock Exam</span>
             </button>
           </div>
         </div>
@@ -225,7 +366,6 @@ export const HomeDashboard: React.FC = () => {
         {/* Circular Readiness Gauge Card */}
         <div className="p-6 rounded-2xl bg-white dark:bg-[#1A2634] border border-[#BDC3C7] dark:border-[#2C3E50] shadow-xs flex items-center gap-6 shrink-0 z-10">
           <div className="relative w-28 h-28 flex items-center justify-center">
-            {/* SVG circle track */}
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
               <circle
                 cx="50"
@@ -247,7 +387,7 @@ export const HomeDashboard: React.FC = () => {
               />
             </svg>
             <div className="absolute flex flex-col items-center justify-center text-center">
-              <span className="text-2xl font-extrabold text-[#2C3E50] dark:text-[#F5F5DC] font-mono leading-none">
+              <span className="text-2xl font-extrabold text-[#2C3E50] dark:text-[#F5F5DC] font-mono leading-none tabular-nums">
                 {readinessPercentage}%
               </span>
               <span className="text-[9px] font-mono font-bold tracking-wider uppercase text-[#2C3E50]/70 dark:text-[#BDC3C7] mt-1">
@@ -256,25 +396,23 @@ export const HomeDashboard: React.FC = () => {
             </div>
           </div>
 
-          <div className="space-y-1.5 text-xs">
+          <div className="space-y-1.5 text-xs tabular-nums">
             <div className="font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
               Passing Mark: 70%
             </div>
             <div className="text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7]">
-              Recommended: 85%+
+              Steps passed: {totalCompletedTasks} / {totalLabSteps}
             </div>
-            <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1 pt-1">
-              <span>📈</span>
-              <span>+6% this week</span>
+            <div className="text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7]">
+              Mock exams: {quizHistory.length}
             </div>
           </div>
         </div>
 
-        {/* Decorative background grid pattern */}
         <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 pointer-events-none bg-[radial-gradient(#1E3A78_1px,transparent_1px)] [background-size:16px_16px]" />
       </div>
 
-      {/* Onboarding & Calibration Strip: Readiness Exam, Tour, and Account */}
+      {/* Onboarding & Calibration Strip */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
         <div className="p-4 rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/20 flex flex-col justify-between space-y-3">
           <div className="space-y-1">
@@ -283,7 +421,7 @@ export const HomeDashboard: React.FC = () => {
               <span>Readiness Diagnostic</span>
             </div>
             <p className="text-xs text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed">
-              Take a short 5-question exam to gauge your Python experience and receive a tailored domain placement recommendation.
+              Take a short 5-question check to gauge your Python experience and get a tailored domain recommendation.
             </p>
           </div>
           <button
@@ -299,17 +437,17 @@ export const HomeDashboard: React.FC = () => {
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-sky-900 dark:text-sky-300">
               <HelpCircle className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-              <span>Site Navigation How-To Guide</span>
+              <span>Site How-To Guide</span>
             </div>
             <p className="text-xs text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed">
-              Explore how the browser IDE, PyTest automated test runner, and tiered code breadcrumbs accelerate your preparation.
+              Walk through the notebook code cells, Worked Patterns, tiered hints, and .ipynb export workflow.
             </p>
           </div>
           <button
             onClick={() => setIsTourModalOpen(true)}
             className="self-start px-3 py-1.5 text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <span>Launch Site Tour</span>
+            <span>Launch Guide</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -318,10 +456,10 @@ export const HomeDashboard: React.FC = () => {
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-[#1E3A78] dark:text-[#BDC3C7]">
               <Settings className="w-4 h-4 text-[#1E3A78] dark:text-[#BDC3C7]" />
-              <span>Account & Study Settings</span>
+              <span>Account &amp; Study Settings</span>
             </div>
             <p className="text-xs text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed">
-              Manage student credentials, update starting domain (Domain 1-5), adjust your target exam date, or reset progress.
+              Update your name, starting domain (Domain 1–5), target exam date, or reset session progress.
             </p>
           </div>
           <button
@@ -337,12 +475,12 @@ export const HomeDashboard: React.FC = () => {
       {/* Daily Learning Streak & Consistency Tracker */}
       <DailyStreakTracker />
 
-      {/* Core Examination Matrix Header & 4 Domain Cards */}
+      {/* Core Examination Matrix */}
       <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#1E3A78] dark:text-[#BDC3C7]">
-              CORE EXAMINATION MATRIX
+            <div className="text-xs font-mono font-semibold text-[#1E3A78] dark:text-[#BDC3C7]">
+              Core Examination Matrix
             </div>
             <h2 className="text-xl font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
               PCEP-30-03 Official Syllabus Modules
@@ -361,20 +499,25 @@ export const HomeDashboard: React.FC = () => {
         {/* 5 Domains Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
           {domainSummaries.map((dom) => (
-            <div
+            <button
               key={dom.num}
+              type="button"
               onClick={() => setActiveView('curriculum')}
-              className="p-4 rounded-xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] shadow-xs space-y-3.5 hover:border-[#1E3A78]/70 dark:hover:border-[#BDC3C7] transition-all cursor-pointer flex flex-col justify-between"
+              className="text-left p-4 rounded-xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] shadow-xs space-y-3.5 hover:border-[#1E3A78]/70 dark:hover:border-[#BDC3C7] transition-all cursor-pointer flex flex-col justify-between"
             >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#2C3E50]/70 dark:text-[#BDC3C7]">
-                    DOMAIN {dom.num} / 5
+              <div className="space-y-2 w-full">
+                <div className="flex items-center justify-between text-[11px] font-mono">
+                  <span className="font-bold text-[#2C3E50]/70 dark:text-[#BDC3C7]">
+                    Domain {dom.num}/5
                   </span>
                   <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${dom.badgeColor}`}
+                    className={`font-semibold tabular-nums ${
+                      dom.progress > 0
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : 'text-[#5D6D7E] dark:text-[#BDC3C7]'
+                    }`}
                   >
-                    {dom.badgeText}
+                    {dom.statusText}
                   </span>
                 </div>
 
@@ -386,8 +529,7 @@ export const HomeDashboard: React.FC = () => {
                 </p>
               </div>
 
-              <div className="space-y-2 pt-2 border-t border-[#BDC3C7]/40 dark:border-[#2C3E50]">
-                {/* Progress bar */}
+              <div className="space-y-2 pt-2 border-t border-[#BDC3C7]/40 dark:border-[#2C3E50] w-full">
                 <div className="w-full h-1.5 rounded-full bg-[#E5E5D8] dark:bg-[#1A2634] overflow-hidden">
                   <div
                     className={`h-full ${
@@ -403,123 +545,104 @@ export const HomeDashboard: React.FC = () => {
                   />
                 </div>
 
-                <div className="flex items-center justify-between text-[10px] font-mono text-[#2C3E50]/70 dark:text-[#BDC3C7]">
+                <div className="flex items-center justify-between text-[10px] font-mono text-[#2C3E50]/70 dark:text-[#BDC3C7] tabular-nums">
                   <span>{dom.footerLeft}</span>
                   <span className="font-semibold text-[#1E3A78] dark:text-[#F5F5DC]">
                     {dom.footerRight}
                   </span>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </section>
 
-      {/* Split Row: Adaptive Flashcard Drill (Left) & Featured Syllabus Lab (Right) */}
+      {/* Split Row: Real Adaptive Flashcard Drill (Left) & Featured Syllabus Lab (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Adaptive Flashcard Drill */}
-        <div className="p-6 rounded-2xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] shadow-xs space-y-5 flex flex-col justify-between">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-[#2C3E50] dark:text-[#F5F5DC]">
-                  ADAPTIVE FLASHCARD DRILL
+        {/* Left: Live Flashcard from Leitner Study Deck */}
+        {activeCard && (
+          <div className="p-6 rounded-2xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] shadow-xs space-y-5 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2 text-xs font-mono">
+                <span className="font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
+                  Quick Flashcard Practice
+                </span>
+
+                <span className="text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7] tabular-nums">
+                  Obj {activeCard.pcepObjective} · Box {activeCard.boxLevel} · {safeIndex + 1} of {activeDeck.length}
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#EBE9DF] dark:bg-[#1A2634] text-[#2C3E50] dark:text-[#BDC3C7] border border-[#BDC3C7]/60 dark:border-[#2C3E50]">
-                  PCEP Block 1.2
-                </span>
-                <span className="text-[11px] font-mono text-[#2C3E50]/70 dark:text-[#BDC3C7]">
-                  Card 14 of 50
-                </span>
+              <div className="space-y-2">
+                <h3 className="text-base font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
+                  {activeCard.frontPrompt}
+                </h3>
               </div>
-            </div>
 
-            <div className="space-y-2">
-              <div className="text-[10px] font-mono font-bold tracking-wider uppercase text-[#2C3E50]/70 dark:text-[#BDC3C7]">
-                QUESTION PROMPT
-              </div>
-              <h3 className="text-base font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
-                What is the exact terminal output of the following Python 3 statement?
-              </h3>
-            </div>
-
-            {/* Code Box */}
-            <div className="p-4 rounded-xl bg-[#141C24] text-[#F5F5DC] font-mono text-xs flex items-center justify-between border border-[#2C3E50]">
-              <code>print(3 * '7')</code>
-              <span className="text-[10px] text-[#BDC3C7] font-mono bg-[#1E2936] px-2 py-0.5 rounded">
-                Type: str * int
-              </span>
-            </div>
-
-            {/* Answer Display */}
-            {flashcardRevealed ? (
-              <div className="p-4 rounded-xl bg-white dark:bg-[#1A2634] border border-[#BDC3C7] dark:border-[#2C3E50] space-y-2 text-xs animate-in fade-in duration-150">
-                <div className="font-bold text-emerald-700 dark:text-emerald-400 font-mono text-sm">
-                  Output: 777
+              {activeCard.codeSnippet && (
+                <div className="p-4 rounded-xl bg-[#141C24] text-[#F5F5DC] font-mono text-xs overflow-x-auto border border-[#2C3E50]">
+                  <pre className="whitespace-pre-wrap">
+                    <code>{activeCard.codeSnippet}</code>
+                  </pre>
                 </div>
-                <p className="text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed text-[11px]">
-                  Multiplying a string by an integer replicates the sequence rather than performing arithmetic addition. Thus, 3 * '7' produces three repetitions: <code>'777'</code>.
-                </p>
-              </div>
-            ) : null}
-          </div>
+              )}
 
-          {/* Drill Action Controls */}
-          <div className="pt-4 border-t border-[#BDC3C7]/40 dark:border-[#2C3E50] flex flex-wrap items-center gap-2 justify-between">
-            {!flashcardRevealed ? (
-              <button
-                onClick={() => setFlashcardRevealed(true)}
-                className="w-full py-2.5 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <span>Reveal Answer</span>
-              </button>
-            ) : (
-              <div className="flex items-center gap-2 w-full">
+              {flashcardRevealed && (
+                <div className="p-4 rounded-xl bg-white dark:bg-[#1A2634] border border-[#BDC3C7] dark:border-[#2C3E50] space-y-2 text-xs animate-in fade-in duration-150">
+                  <div className="font-bold text-emerald-700 dark:text-emerald-400 font-mono text-sm">
+                    {activeCard.backAnswer}
+                  </div>
+                  {activeCard.syntaxGotcha && (
+                    <p className="text-[#2C3E50]/80 dark:text-[#BDC3C7] leading-relaxed text-[11px]">
+                      {activeCard.syntaxGotcha}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Drill Action Controls */}
+            <div className="pt-4 border-t border-[#BDC3C7]/40 dark:border-[#2C3E50] flex flex-wrap items-center gap-2 justify-between">
+              {!flashcardRevealed ? (
                 <button
-                  onClick={() => {
-                    setFlashcardMastered(false);
-                    setTimeout(() => {
-                      setFlashcardRevealed(false);
-                      setFlashcardMastered(null);
-                    }, 800);
-                  }}
-                  className="flex-1 py-2 rounded-lg text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-900/40 hover:bg-rose-100 transition-colors cursor-pointer"
+                  onClick={() => setFlashcardRevealed(true)}
+                  className="w-full py-2.5 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  Needs Review
+                  <span>Reveal Answer</span>
                 </button>
-                <button
-                  onClick={() => {
-                    setFlashcardMastered(true);
-                    setTimeout(() => {
-                      setFlashcardRevealed(false);
-                      setFlashcardMastered(null);
-                    }, 800);
-                  }}
-                  className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-600 shadow-xs transition-colors cursor-pointer"
-                >
-                  Got it Mastered
-                </button>
-              </div>
-            )}
+              ) : (
+                <div className="flex items-center gap-2 w-full">
+                  <button
+                    onClick={() => handleReviewHomeCard(false)}
+                    className="flex-1 py-2 rounded-lg text-xs font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-900/40 hover:bg-rose-100 transition-colors cursor-pointer"
+                  >
+                    Needs Review
+                  </button>
+                  <button
+                    onClick={() => handleReviewHomeCard(true)}
+                    className="flex-1 py-2 rounded-lg text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-600 shadow-xs transition-colors cursor-pointer"
+                  >
+                    Got It Mastered
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Right: Featured Syllabus Lab */}
         <div className="p-6 rounded-2xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] shadow-xs space-y-5 flex flex-col justify-between">
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between text-xs font-mono">
               <div className="flex items-center gap-2">
                 <Code2 className="w-4 h-4 text-[#1E3A78] dark:text-[#BDC3C7]" />
-                <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-[#2C3E50] dark:text-[#F5F5DC]">
-                  RECOMMENDED SYLLABUS LAB
+                <span className="font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
+                  Active Syllabus Lab
                 </span>
               </div>
 
-              <span className="px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-[#1E3A78]/15 dark:bg-[#1E3A78]/40 text-[#1E3A78] dark:text-[#F5F5DC] border border-[#1E3A78]/30">
-                Domain {currentProject.sectionNumber}
+              <span className="text-[#1E3A78] dark:text-[#BDC3C7] font-semibold">
+                Domain {currentProject.sectionNumber} · {currentProject.estimatedMinutes} min
               </span>
             </div>
 
@@ -532,16 +655,8 @@ export const HomeDashboard: React.FC = () => {
               </p>
             </div>
 
-            {/* Keyword tags */}
-            <div className="flex flex-wrap gap-1.5 font-mono text-[10px]">
-              {currentProject.specificObjectives.map((objId) => (
-                <span
-                  key={objId}
-                  className="px-2 py-0.5 rounded bg-white dark:bg-[#1A2634] text-[#2C3E50] dark:text-[#BDC3C7] border border-[#BDC3C7]/60 dark:border-[#2C3E50]"
-                >
-                  Obj {objId}
-                </span>
-              ))}
+            <div className="text-[11px] font-mono text-[#5D6D7E] dark:text-[#BDC3C7]">
+              Objectives: {currentProject.specificObjectives.join(' · ')}
             </div>
 
             {/* Progress Container */}
@@ -553,7 +668,7 @@ export const HomeDashboard: React.FC = () => {
                     : `Next: ${nextStepObj.title}`}
                 </span>
                 <span className="font-mono text-[11px] font-bold text-[#1E3A78] dark:text-[#BDC3C7] shrink-0 tabular-nums">
-                  {featuredPct}% Complete
+                  {featuredPct}%
                 </span>
               </div>
 
@@ -565,13 +680,12 @@ export const HomeDashboard: React.FC = () => {
                 <span>Steps passed: {featuredCompleted} / {featuredTotal}</span>
                 <span className="text-[#1E3A78] dark:text-[#BDC3C7] font-semibold flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" />
-                  <span>{currentProject.estimatedMinutes} min</span>
+                  <span>{featuredCompleted === featuredTotal ? 'Complete' : 'Ready in IDE'}</span>
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Action Button */}
           <div className="pt-4 border-t border-[#BDC3C7]/40 dark:border-[#2C3E50] flex items-center gap-3">
             <button
               onClick={handleLaunchFeaturedLab}
@@ -584,35 +698,32 @@ export const HomeDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Bottom GitHub Sync Status Bar */}
+      {/* Bottom Portfolio & Bonus Projects Action Bar */}
       <div className="p-4 rounded-xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-[#1E3A78]/10 text-[#1E3A78] dark:text-[#BDC3C7] flex items-center justify-center border border-[#1E3A78]/20 shrink-0">
-            <GitBranch className="w-4 h-4" />
+        <div className="space-y-0.5">
+          <div className="font-semibold text-xs text-[#2C3E50] dark:text-[#F5F5DC]">
+            Portfolio &amp; Bonus Challenges
           </div>
-
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
-                github.com/{currentUser.githubHandle || 'candidate'}/pcep-prep-2025
-              </span>
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400">
-                Up to date
-              </span>
-            </div>
-            <p className="text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7] font-mono">
-              Last pushed commit: <code className="text-[#1E3A78] dark:text-[#BDC3C7]">e4f9b2c</code> "Add solution for Section 2 while-else puzzle" (2 hours ago)
-            </p>
-          </div>
+          <p className="text-[11px] text-[#2C3E50]/75 dark:text-[#BDC3C7] tabular-nums">
+            {completedLabsCount} of 5 Syllabus Labs complete · {selectedBonusProjectIds.length} Bonus Projects bookmarked · Generate README.md and .gitignore files anytime
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            onClick={() => setActiveView('bonus')}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
+          >
+            <Rocket className="w-3.5 h-3.5" />
+            <span>Explore Bonus Projects</span>
+          </button>
+
           <button
             onClick={() => setIsReadmeModalOpen(true)}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-white dark:bg-[#1A2634] border border-[#BDC3C7] dark:border-[#2C3E50] hover:bg-[#EBE9DF] dark:hover:bg-[#1E2936] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap"
           >
             <FileText className="w-3.5 h-3.5 text-[#1E3A78] dark:text-[#BDC3C7]" />
-            <span>Launch README Architect</span>
+            <span>README Generator</span>
           </button>
         </div>
       </div>

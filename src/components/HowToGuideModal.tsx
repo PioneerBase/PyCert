@@ -35,13 +35,13 @@ export const HowToGuideModal: React.FC = () => {
   const steps: GuideStep[] = [
     {
       title: 'Welcome to PyCert 30-03',
-      tagline: 'Your Project-First Python Certification Prep Studio',
+      tagline: 'What This App Does & Where to Start',
       description:
-        'PyCert is designed around all 36 syllabus objectives of the Python Institute PCEP-30-03 exam. Rather than passive video lectures, you learn by building verified Python code and real project repositories.',
+        'PyCert 30-03 helps you master every PCEP-30-03 Python exam objective by writing and running real Python code in your browser—no setup or installs required.',
       bulletPoints: [
-        'Organized across 5 foundational syllabus domains.',
-        'Starts you at 0% so every line of code and test passed is your genuine work.',
-        'Quick navigation bar at the top lets you move between workspace, portfolio, and review drills anytime.',
+        'Where to start: Take the 5-question Diagnostic to pick your domain, or open Lab 1 in Syllabus Labs (IDE).',
+        'Practice daily with Leitner Flashcards and timed 45-minute Mock Exams.',
+        'Explore 51 Bonus Projects (Easy through Cerebral Conquest) and export any notebook as .ipynb.',
       ],
       icon: <Compass className="w-6 h-6 text-sky-400" />,
       navHighlightView: 'home',
@@ -54,7 +54,7 @@ export const HowToGuideModal: React.FC = () => {
       bulletPoints: [
         'Open the Worked Pattern example in any cell to see an analogous solution before writing code.',
         'Replace the # TODO line, then press Shift+Enter or click "Run & Check Step" to see output, pass/fail checks, and live variables right below the cell.',
-        'Variables and functions stay alive across cells — use "Run All Cells" or "Restart Kernel" anytime.',
+        'Download your finished notebook anytime with the "Export as .ipynb" button.',
       ],
       icon: <Code2 className="w-6 h-6 text-emerald-400" />,
       navHighlightView: 'workspace',
@@ -73,14 +73,14 @@ export const HowToGuideModal: React.FC = () => {
       navHighlightView: 'workspace',
     },
     {
-      title: 'Certified Portfolio & Git Sync Manager',
-      tagline: 'Transform Labs into Recruiter-Ready GitHub Repositories',
+      title: 'Portfolio, Bonus Projects & Export Tools',
+      tagline: 'Turn Completed Python Labs into Showcase Artifacts',
       description:
-        'Head over to Projects & Portfolio to turn your completed labs into audited open-source repositories ready for technical recruiters.',
+        'Track your 5 Syllabus Labs in Projects & Portfolio, generate clean README.md and .gitignore files, and take on 51 Bonus Projects across four difficulty tiers.',
       bulletPoints: [
-        'Generates markdown README badges, requirements.txt, and unit suites.',
-        'Live Git sync telemetry simulates production commits and tag releases.',
-        'Export portfolio JSON snapshots to showcase your Python competency.',
+        'Track step completion across all 5 PCEP domains in real time.',
+        'Generate custom README.md documentation and .gitignore files for GitHub.',
+        'Export standard .ipynb Jupyter Notebooks or JSON portfolio summaries.',
       ],
       icon: <FolderGit2 className="w-6 h-6 text-purple-400" />,
       navHighlightView: 'portfolio',
@@ -89,7 +89,7 @@ export const HowToGuideModal: React.FC = () => {
       title: 'Account Settings & Readiness Diagnostic',
       tagline: 'Customize Your Pace, Starting Domain & Exam Target',
       description:
-        'You can update your profile, adjust your starting domain, take the quick diagnostic exam, or reset your workspace anytime using the Account button in the top bar.',
+        'Update your profile, adjust your starting domain, take the quick diagnostic exam, or reset your workspace anytime using the Account button in the top bar.',
       bulletPoints: [
         'Click your user avatar or the "Account" button in the top bar anytime.',
         'Switch starting domains (Domain 1 through 5) based on your evolving experience.',
@@ -104,7 +104,7 @@ export const HowToGuideModal: React.FC = () => {
 
   const handleFinish = () => {
     updateUserProfile({
-      hasSeenTour: true,
+      hasSeenTour: dontShowAgain,
     });
     setIsTourModalOpen(false);
   };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProgress } from '../context/ProgressContext';
 import { X, Copy, Check, Download, GitBranch } from 'lucide-react';
 
@@ -14,11 +14,23 @@ export const GitReadmeModal: React.FC<GitReadmeModalProps> = ({ isOpen, onClose 
   const [projectTitle, setProjectTitle] = useState<string>(currentProject.title);
   const [authorName, setAuthorName] = useState<string>(currentUser.name || 'Student Developer');
   const [githubHandle, setGithubHandle] = useState<string>(currentUser.githubHandle || 'your-github');
-  const [repoName, setRepoName] = useState<string>('pycert-portfolio-project');
+  const [repoName] = useState<string>('pycert-portfolio-project');
   const [projectDesc, setProjectDesc] = useState<string>(
     currentProject.description || 'A Python application demonstrating core computer science concepts and PCEP-30-03 certification syllabus objectives.'
   );
   const [copied, setCopied] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setProjectTitle(currentProject.title);
+      setAuthorName(currentUser.name || 'Student Developer');
+      setGithubHandle(currentUser.githubHandle || 'your-github');
+      setProjectDesc(
+        currentProject.description ||
+          'A Python application demonstrating core computer science concepts and PCEP-30-03 certification syllabus objectives.'
+      );
+    }
+  }, [isOpen, currentProject, currentUser]);
 
   if (!isOpen) return null;
 
@@ -31,7 +43,7 @@ export const GitReadmeModal: React.FC<GitReadmeModalProps> = ({ isOpen, onClose 
 ## 📌 Project Overview
 ${projectDesc}
 
-Built as part of the **PyCert (BuildTrace AI)** project-first certification curriculum, bridging technical problem-solving with rigorous Python Institute **PCEP-30-03** exam syllabus standards.
+Built as part of the **PyCert 30-03** project-first certification curriculum, bridging technical problem-solving with Python Institute **PCEP-30-03** exam syllabus standards.
 
 ---
 

@@ -802,7 +802,7 @@ export const Workspace: React.FC = () => {
                       </div>
 
                       <span className="text-[11px] text-[#BDC3C7] tabular-nums">
-                        {result.durationMs}ms · {result.engine === 'pyodide-wasm' ? 'Pyodide 3.11' : 'Simulator'}
+                        {result.durationMs}ms · {result.engine === 'pyodide-wasm' ? 'Pyodide 3.11' : 'Browser Python'}
                       </span>
                     </div>
                   )}

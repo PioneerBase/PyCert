@@ -35,6 +35,7 @@ export const Navbar: React.FC = () => {
     selectedBonusProjectIds,
   } = useProgress();
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [logoLoadError, setLogoLoadError] = useState<boolean>(false);
 
   const checkedCount = checklistItems.filter((i) => i.checked).length;
   const cardsDueCount = flashcards.filter(
@@ -54,11 +55,23 @@ export const Navbar: React.FC = () => {
         {/* Wordmark */}
         <button
           onClick={() => setActiveView('home')}
-          className="flex items-center gap-2.5 text-left text-lg font-bold tracking-tight text-[#1E3A78] dark:text-[#F5F5DC] hover:opacity-90 transition-opacity whitespace-nowrap shrink-0 focus-visible:outline-hidden"
+          className="flex items-center gap-2.5 text-left text-lg font-bold tracking-tight text-[#1E3A78] dark:text-[#F5F5DC] hover:opacity-90 transition-opacity whitespace-nowrap shrink-0 focus-visible:outline-hidden cursor-pointer"
         >
-          <div className="w-8 h-8 rounded-lg bg-[#5A1827] text-[#F5F5DC] flex items-center justify-center shadow-xs">
-            <span className="font-mono font-black text-sm">Py</span>
-          </div>
+          {!logoLoadError ? (
+            <div className="h-9 w-16 rounded-lg overflow-hidden border border-[#BDC3C7]/70 dark:border-[#2C3E50] bg-[#0F1B2B] shadow-xs shrink-0">
+              <img
+                src="/assets/aistudio/pycert_efd0a0c9.jpg"
+                alt="PyCert 30-03 Logo"
+                referrerPolicy="no-referrer"
+                onError={() => setLogoLoadError(true)}
+                className="w-full h-full object-cover object-center"
+              />
+            </div>
+          ) : (
+            <div className="w-9 h-9 rounded-lg bg-[#1E3A78] text-[#F5F5DC] flex items-center justify-center shadow-xs shrink-0">
+              <Code2 className="w-5 h-5" />
+            </div>
+          )}
           <div className="flex flex-col">
             <span className="font-sans font-black text-base tracking-tight text-[#1E3A78] dark:text-[#F5F5DC] leading-none">
               PyCert 30-03

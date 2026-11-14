@@ -74,8 +74,7 @@ export async function getPyodide(): Promise<any | null> {
         } else {
           resolve(null);
         }
-      } catch (err) {
-        console.warn('Pyodide CDN load error or offline, fallback simulator active:', err);
+      } catch {
         resolve(null);
       }
     });
@@ -97,8 +96,8 @@ export async function resetNotebookKernel(): Promise<void> {
       await window.pyodideInstance.runPythonAsync(`
 _pycert_ns = {}
 `);
-    } catch (err) {
-      console.warn('Could not clear Pyodide notebook namespace:', err);
+    } catch {
+      // Ignore namespace reset error if runtime is unavailable
     }
   }
 }
@@ -516,7 +515,7 @@ function simulateNotebookCell(
   }
 
   return {
-    stdout: stdoutLines.join('\n') || 'Cell evaluated (offline simulator mode).',
+    stdout: stdoutLines.join('\n'),
     stderr: '',
     isError: false,
     durationMs: Math.round(performance.now() - startTime),

@@ -14,6 +14,7 @@ interface ProgressContextType {
   currentCode: string;
   setCurrentCode: (code: string) => void;
   getCellCode: (cellId: string) => string;
+  getProjectCellCode: (projectId: string, cellId: string) => string;
   setCellCode: (cellId: string, code: string) => void;
   resetCellCode: (cellId: string) => void;
   resetProjectCode: () => void;
@@ -136,6 +137,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     startingDomain: 1,
     experienceLevel: 'Beginner',
     hasSeenTour: false,
+    hasDismissedWelcome: false,
     studyPace: 'standard',
   });
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(true);
@@ -200,15 +202,15 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               : INITIAL_STREAK.todaysTasksCompleted,
           });
         }
-        if (parsed.userProfile && parsed.userProfile.isAuthenticated && parsed.userProfile.name !== 'Devon Vance') {
+        if (parsed.userProfile && parsed.userProfile.isAuthenticated) {
           setCurrentUser(parsed.userProfile);
           setIsLoginModalOpen(false);
         } else {
           setIsLoginModalOpen(true);
         }
       }
-    } catch (e) {
-      console.warn('Could not parse saved PyCert progress:', e);
+    } catch {
+      // Ignore corrupted localStorage payloads
     }
   }, []);
 
@@ -231,8 +233,8 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           streakData,
         })
       );
-    } catch (e) {
-      console.warn('Failed to save progress to localStorage', e);
+    } catch {
+      // Ignore storage quota errors
     }
   }, [completedStepsMap, codeSnapshots, cellSnapshots, selectedBonusProjectIds, flashcards, checklistItems, quizHistory, darkMode, currentUser, streakData]);
 
@@ -249,11 +251,16 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const currentProject =
     allProjects.find((p) => p.id === selectedProjectId) || MICRO_PROJECTS[0];
 
-  const getCellCode = (cellId: string): string => {
-    const saved = cellSnapshots[selectedProjectId]?.[cellId];
+  const getProjectCellCode = (projectId: string, cellId: string): string => {
+    const saved = cellSnapshots[projectId]?.[cellId];
     if (typeof saved === 'string') return saved;
-    const cellDef = currentProject.notebookCells?.find((c) => c.id === cellId);
+    const proj = allProjects.find((p) => p.id === projectId);
+    const cellDef = proj?.notebookCells?.find((c) => c.id === cellId);
     return cellDef ? cellDef.starterCode : '';
+  };
+
+  const getCellCode = (cellId: string): string => {
+    return getProjectCellCode(selectedProjectId, cellId);
   };
 
   const setCellCode = (cellId: string, code: string) => {
@@ -497,8 +504,8 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           streakData: INITIAL_STREAK,
         })
       );
-    } catch (e) {
-      console.warn('Failed to reset progress in localStorage', e);
+    } catch {
+      // Ignore storage quota errors
     }
   };
 
@@ -520,8 +527,6 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const defaultExamDate = new Date();
     defaultExamDate.setDate(defaultExamDate.getDate() + 30);
 
-    const isFirstTime = !currentUser.isAuthenticated && !currentUser.hasSeenTour;
-
     const profile: UserProfile = {
       name: displayName,
       email: email || 'candidate@student.pcep',
@@ -534,22 +539,18 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       targetExamDate: currentUser.targetExamDate || defaultExamDate.toISOString().split('T')[0],
       studyPace: currentUser.studyPace || 'standard',
       hasSeenTour: currentUser.hasSeenTour || false,
+      hasDismissedWelcome: currentUser.hasDismissedWelcome || false,
       diagnosticResult: currentUser.diagnosticResult,
     };
 
     setCurrentUser(profile);
     setIsLoginModalOpen(false);
 
-    // Auto-select corresponding micro-project based on selected starting domain
+    // Pre-select the matching syllabus lab for their chosen starting domain
     const targetProj = MICRO_PROJECTS.find((p) => p.sectionNumber === startingDomain) || MICRO_PROJECTS[0];
     setSelectedProjectId(targetProj.id);
     setCurrentStepIndex(0);
-    setActiveView('workspace');
-
-    // Auto activate how-to tour on first login/signup as requested!
-    if (isFirstTime || !profile.hasSeenTour) {
-      setIsTourModalOpen(true);
-    }
+    setActiveView('home');
   };
 
   const logout = () => {
@@ -563,6 +564,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       startingDomain: 1,
       experienceLevel: 'Beginner',
       hasSeenTour: false,
+      hasDismissedWelcome: false,
       studyPace: 'standard',
     });
     setIsLoginModalOpen(true);
@@ -580,6 +582,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         currentCode,
         setCurrentCode,
         getCellCode,
+        getProjectCellCode,
         setCellCode,
         resetCellCode,
         resetProjectCode,
