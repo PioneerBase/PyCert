@@ -1,0 +1,1 @@
+[{"id": 1, "topic": "types", "q": "Type of 3.0?", "answer": "float"}, {"id": 2, "topic": "loops", "q": "Keyword to exit loop early?", "answer": "break"}, {"id": 3, "topic": "types", "q": "Type of True?", "answer": "bool"}, {"id": 4, "topic": "functions", "q": "Default return when no return?", "answer": "None"}]

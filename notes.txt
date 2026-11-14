@@ -1,0 +1,3 @@
+Python builds clarity.
+Functions keep code clean.
+Test every step.

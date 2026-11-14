@@ -1,0 +1,9 @@
+{
+  "valid_orders": 3,
+  "total_units": 9,
+  "grand_total": 310.0,
+  "revenue_by_region": {
+    "WEST": 210.0,
+    "EAST": 100.0
+  }
+}

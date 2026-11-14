@@ -1,0 +1,12 @@
+{
+  "978-01": {
+    "isbn": "978-01",
+    "title": "Fluent Python",
+    "borrower": "Alice"
+  },
+  "978-02": {
+    "isbn": "978-02",
+    "title": "Clean Code",
+    "borrower": null
+  }
+}

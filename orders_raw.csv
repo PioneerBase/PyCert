@@ -1,0 +1,5 @@
+region,item,qty,unit_price
+ west , Keyboard , 3 , 50.0 
+east,Monitor,bad,200.0
+EAST,Mouse,4,25.0
+west,USB Hub,2,30.0

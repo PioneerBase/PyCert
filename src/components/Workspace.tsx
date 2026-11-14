@@ -6,6 +6,8 @@ import { KernelVariable, NotebookCell, ProjectStep } from '../types';
 import {
   executeNotebookCell,
   resetNotebookKernel,
+  reloadPythonRuntime,
+  prewarmPyodide,
   NotebookCellResult,
 } from '../services/pythonRunner';
 import { downloadIpynbFile } from '../utils/ipynbExporter';
@@ -84,6 +86,8 @@ export const Workspace: React.FC = () => {
   } | null>(null);
 
   const cellTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+  const executedCellsRef = useRef<Set<string>>(new Set());
+  const activeProjectIdRef = useRef<string>(currentProject.id);
 
   const cells: NotebookCell[] = currentProject.notebookCells || [
     {
@@ -99,16 +103,20 @@ export const Workspace: React.FC = () => {
   const currentStep: ProjectStep =
     currentProject.steps[currentStepIndex] || currentProject.steps[0];
 
-  // Reset shared Python kernel & clear stale inline cell outputs whenever switching labs
+  // Reset shared Python kernel & clear stale inline cell outputs whenever switching labs or mounting
   useEffect(() => {
     let active = true;
+    activeProjectIdRef.current = currentProject.id;
+    executedCellsRef.current.clear();
+
     setActiveWorkspaceTab('notebook');
     setCellResults({});
     setRunningCellId(null);
     setIsRunningAll(false);
-    setKernelBannerMsg(null);
+    setIsKernelResetting(false);
+    setKernelBannerMsg('Preparing shared Python 3.11 kernel...');
 
-    // Open the first incomplete step's worked pattern by default
+    // Open the first step's worked pattern by default
     const firstStepCell = cells.find((c) => c.kind === 'step');
     if (firstStepCell) {
       setOpenPatterns({ [firstStepCell.id]: true });
@@ -116,11 +124,18 @@ export const Workspace: React.FC = () => {
       setOpenPatterns({});
     }
 
-    resetNotebookKernel().then(() => {
-      if (active) {
-        setKernelBannerMsg('Fresh shared Python kernel ready for this lab.');
-      }
-    });
+    prewarmPyodide();
+    resetNotebookKernel()
+      .then(() => {
+        if (active) {
+          setKernelBannerMsg('Fresh shared Python kernel ready for this lab.');
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setKernelBannerMsg('Python kernel ready.');
+        }
+      });
 
     return () => {
       active = false;
@@ -131,6 +146,25 @@ export const Workspace: React.FC = () => {
   const getStepForCell = (cell: NotebookCell): ProjectStep | undefined => {
     if (cell.kind !== 'step' || !cell.stepNumber) return undefined;
     return currentProject.steps.find((s) => s.stepNumber === cell.stepNumber);
+  };
+
+  const getLatestCellCode = (cellId: string): string => {
+    return cellTextareaRefs.current[cellId]?.value ?? getCellCode(cellId);
+  };
+
+  const updateCellCodeAndInvalidate = (cellId: string, nextCode: string) => {
+    executedCellsRef.current.delete(cellId);
+    setCellCode(cellId, nextCode);
+  };
+
+  const clearSingleCellResult = (cellId: string) => {
+    executedCellsRef.current.delete(cellId);
+    setCellResults((prev) => {
+      if (!(cellId in prev)) return prev;
+      const next = { ...prev };
+      delete next[cellId];
+      return next;
+    });
   };
 
   const applyExecutionResult = (
@@ -157,92 +191,157 @@ export const Workspace: React.FC = () => {
     }
   };
 
+  const buildStepCheckPayload = (step?: ProjectStep) =>
+    step
+      ? {
+          stepNumber: step.stepNumber,
+          validationSnippet: step.validationSnippet,
+          diagnosticExpr: step.diagnosticExpr,
+          expectedExample: step.expectedExample,
+        }
+      : undefined;
+
   const handleRunCell = async (cell: NotebookCell, focusNext: boolean = false) => {
-    if (isRunningAll) return;
+    if (isRunningAll || runningCellId || isKernelResetting) return;
+    const projectIdAtStart = currentProject.id;
+
     setRunningCellId(cell.id);
     setKernelBannerMsg(null);
 
-    const step = getStepForCell(cell);
-    if (step) {
-      const idx = currentProject.steps.findIndex((s) => s.stepNumber === step.stepNumber);
-      if (idx >= 0) setCurrentStepIndex(idx);
-    }
-
-    const code = getCellCode(cell.id);
-    const result = await executeNotebookCell(
-      cell.id,
-      code,
-      step
-        ? {
-            stepNumber: step.stepNumber,
-            validationSnippet: step.validationSnippet,
-            diagnosticExpr: step.diagnosticExpr,
-            expectedExample: step.expectedExample,
-          }
-        : undefined
-    );
-
-    applyExecutionResult(cell, result, step);
-    setRunningCellId(null);
-
-    if (focusNext) {
-      const curIdx = cells.findIndex((c) => c.id === cell.id);
-      if (curIdx >= 0 && curIdx < cells.length - 1) {
-        const nextCell = cells[curIdx + 1];
-        requestAnimationFrame(() => {
-          cellTextareaRefs.current[nextCell.id]?.focus();
-        });
+    try {
+      const step = getStepForCell(cell);
+      if (step) {
+        const idx = currentProject.steps.findIndex((s) => s.stepNumber === step.stepNumber);
+        if (idx >= 0) setCurrentStepIndex(idx);
       }
+
+      // Auto-run unexecuted earlier cells (e.g. Setup or prior steps after a page reload)
+      const targetIdx = cells.findIndex((c) => c.id === cell.id);
+      let autoHydratedCount = 0;
+
+      if (targetIdx > 0) {
+        for (let i = 0; i < targetIdx; i++) {
+          const prevCell = cells[i];
+          if (executedCellsRef.current.has(prevCell.id)) continue;
+          if (activeProjectIdRef.current !== projectIdAtStart) return;
+
+          setRunningCellId(prevCell.id);
+          const prevStep = getStepForCell(prevCell);
+          const prevCode = getLatestCellCode(prevCell.id);
+          const prevResult = await executeNotebookCell(
+            prevCell.id,
+            prevCode,
+            buildStepCheckPayload(prevStep)
+          );
+
+          if (activeProjectIdRef.current !== projectIdAtStart) return;
+          if (!prevResult.isError) {
+            executedCellsRef.current.add(prevCell.id);
+          }
+          applyExecutionResult(prevCell, prevResult, prevStep);
+          autoHydratedCount += 1;
+        }
+      }
+
+      if (activeProjectIdRef.current !== projectIdAtStart) return;
+      setRunningCellId(cell.id);
+
+      const code = getLatestCellCode(cell.id);
+      const result = await executeNotebookCell(cell.id, code, buildStepCheckPayload(step));
+
+      if (activeProjectIdRef.current !== projectIdAtStart) return;
+      if (!result.isError) {
+        executedCellsRef.current.add(cell.id);
+      } else {
+        executedCellsRef.current.delete(cell.id);
+      }
+      applyExecutionResult(cell, result, step);
+
+      if (autoHydratedCount > 0) {
+        setKernelBannerMsg(
+          `Loaded ${autoHydratedCount} prerequisite cell${autoHydratedCount > 1 ? 's' : ''} and executed ${cell.title}.`
+        );
+      }
+
+      if (focusNext) {
+        const curIdx = cells.findIndex((c) => c.id === cell.id);
+        if (curIdx >= 0 && curIdx < cells.length - 1) {
+          const nextCell = cells[curIdx + 1];
+          requestAnimationFrame(() => {
+            cellTextareaRefs.current[nextCell.id]?.focus();
+          });
+        }
+      }
+    } finally {
+      setRunningCellId(null);
     }
   };
 
   const handleRunAllCells = async () => {
-    if (isRunningAll || runningCellId) return;
+    if (isRunningAll || runningCellId || isKernelResetting) return;
+    const projectIdAtStart = currentProject.id;
+
     setIsRunningAll(true);
     setCellResults({});
+    executedCellsRef.current.clear();
     setKernelBannerMsg('Restarted shared kernel · Running all cells top to bottom...');
 
-    await resetNotebookKernel();
+    try {
+      await resetNotebookKernel();
 
-    for (const cell of cells) {
-      setRunningCellId(cell.id);
-      const step = getStepForCell(cell);
-      const code = getCellCode(cell.id);
-      const result = await executeNotebookCell(
-        cell.id,
-        code,
-        step
-          ? {
-              stepNumber: step.stepNumber,
-              validationSnippet: step.validationSnippet,
-              diagnosticExpr: step.diagnosticExpr,
-              expectedExample: step.expectedExample,
-            }
-          : undefined
-      );
-      applyExecutionResult(cell, result, step);
+      for (const cell of cells) {
+        if (activeProjectIdRef.current !== projectIdAtStart) return;
+        setRunningCellId(cell.id);
+        const step = getStepForCell(cell);
+        const code = getLatestCellCode(cell.id);
+        const result = await executeNotebookCell(cell.id, code, buildStepCheckPayload(step));
+
+        if (activeProjectIdRef.current !== projectIdAtStart) return;
+        if (!result.isError) {
+          executedCellsRef.current.add(cell.id);
+        }
+        applyExecutionResult(cell, result, step);
+      }
+
+      setKernelBannerMsg('All cells executed top to bottom in the shared kernel.');
+    } finally {
+      setRunningCellId(null);
+      setIsRunningAll(false);
     }
-
-    setRunningCellId(null);
-    setIsRunningAll(false);
-    setKernelBannerMsg('All cells executed top to bottom in the shared kernel.');
   };
 
   const handleRestartKernel = async () => {
-    if (isRunningAll || runningCellId) return;
+    if (isRunningAll || runningCellId || isKernelResetting) return;
     setIsKernelResetting(true);
-    await resetNotebookKernel();
-    setCellResults({});
-    setIsKernelResetting(false);
-    setKernelBannerMsg('Kernel restarted. Live variables cleared (your code is preserved).');
+    setKernelBannerMsg('Reloading Python kernel and clearing live variables...');
+
+    try {
+      executedCellsRef.current.clear();
+      setCellResults({});
+      const status = await reloadPythonRuntime(true);
+      setKernelBannerMsg(
+        status.ready
+          ? 'Python 3.11 kernel reloaded & live variables cleared (your code is preserved).'
+          : 'Kernel variables cleared (your code is preserved).'
+      );
+    } finally {
+      setIsKernelResetting(false);
+    }
   };
 
   const handleResetLab = async () => {
-    if (isRunningAll || runningCellId) return;
-    resetProjectCode();
-    await resetNotebookKernel();
-    setCellResults({});
-    setKernelBannerMsg('All cells restored to starter code and kernel restarted.');
+    if (isRunningAll || runningCellId || isKernelResetting) return;
+    setIsKernelResetting(true);
+
+    try {
+      executedCellsRef.current.clear();
+      resetProjectCode();
+      await resetNotebookKernel();
+      setCellResults({});
+      setKernelBannerMsg('All cells restored to starter code and kernel restarted.');
+    } finally {
+      setIsKernelResetting(false);
+    }
   };
 
   const handleExportIpynb = () => {
@@ -265,7 +364,7 @@ export const Workspace: React.FC = () => {
       const end = textarea.selectionEnd;
       const value = textarea.value;
       const newValue = value.substring(0, start) + '    ' + value.substring(end);
-      setCellCode(cell.id, newValue);
+      updateCellCodeAndInvalidate(cell.id, newValue);
       requestAnimationFrame(() => {
         textarea.selectionStart = textarea.selectionEnd = start + 4;
       });
@@ -288,7 +387,7 @@ export const Workspace: React.FC = () => {
       e.preventDefault();
       const insertion = '\n' + currentIndent + extraIndent;
       const newValue = value.substring(0, start) + insertion + value.substring(end);
-      setCellCode(cell.id, newValue);
+      updateCellCodeAndInvalidate(cell.id, newValue);
       requestAnimationFrame(() => {
         const nextPos = start + insertion.length;
         textarea.selectionStart = textarea.selectionEnd = nextPos;
@@ -297,13 +396,14 @@ export const Workspace: React.FC = () => {
   };
 
   const handleCopyCell = (cellId: string) => {
-    navigator.clipboard.writeText(getCellCode(cellId));
+    navigator.clipboard.writeText(getLatestCellCode(cellId));
     setCopiedCellId(cellId);
     setTimeout(() => setCopiedCellId(null), 1800);
   };
 
   const handleLoadCellSolution = (cell: NotebookCell) => {
-    setCellCode(cell.id, cell.solutionCode);
+    updateCellCodeAndInvalidate(cell.id, cell.solutionCode);
+    clearSingleCellResult(cell.id);
   };
 
   const handleOpenBookmarkFromCell = (cell: NotebookCell) => {
@@ -353,12 +453,12 @@ export const Workspace: React.FC = () => {
   };
 
   const handleInsertSnippetIntoCell = (cellId: string, snippetCode: string) => {
-    const existing = getCellCode(cellId);
+    const existing = getLatestCellCode(cellId);
     const trimmedExisting = existing.replace(/\s+$/, '');
     const nextCode = trimmedExisting
       ? `${trimmedExisting}\n\n${snippetCode}`
       : snippetCode;
-    setCellCode(cellId, nextCode);
+    updateCellCodeAndInvalidate(cellId, nextCode);
     setActiveWorkspaceTab('notebook');
     setKernelBannerMsg('Inserted saved snippet into your active notebook cell.');
     requestAnimationFrame(() => {
@@ -801,7 +901,10 @@ export const Workspace: React.FC = () => {
 
                     <button
                       type="button"
-                      onClick={() => resetCellCode(cell.id)}
+                      onClick={() => {
+                        resetCellCode(cell.id);
+                        clearSingleCellResult(cell.id);
+                      }}
                       className="px-2.5 py-1 rounded text-[#BDC3C7] hover:text-[#F5F5DC] border border-[#2C3E50] hover:bg-[#1E2936] transition-colors cursor-pointer whitespace-nowrap"
                       title="Reset this cell to starter code"
                     >
@@ -871,7 +974,7 @@ export const Workspace: React.FC = () => {
                       cellTextareaRefs.current[cell.id] = el;
                     }}
                     value={code}
-                    onChange={(e) => setCellCode(cell.id, e.target.value)}
+                    onChange={(e) => updateCellCodeAndInvalidate(cell.id, e.target.value)}
                     onKeyDown={(e) => handleCellKeyDown(e, cell)}
                     rows={Math.max(6, codeLines.length + 1)}
                     wrap="off"
@@ -891,7 +994,7 @@ export const Workspace: React.FC = () => {
 
                   <button
                     type="button"
-                    disabled={isRunningAll || isThisRunning}
+                    disabled={isRunningAll || isKernelResetting || Boolean(runningCellId)}
                     onClick={() => handleRunCell(cell, false)}
                     className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0 ${
                       cell.kind === 'setup'
