@@ -1,4 +1,4 @@
-import { PcepSection, MicroProject, Flashcard, QuizQuestion, ChecklistItem, CapstoneProject } from '../types';
+import { PcepSection, MicroProject, Flashcard, ChecklistItem, CapstoneProject } from '../types';
 
 export const PCEP_SECTIONS: PcepSection[] = [
   {
@@ -1347,118 +1347,7 @@ export const INITIAL_FLASHCARDS: Flashcard[] = [
   },
 ];
 
-export const PRACTICE_EXAM_QUESTIONS: QuizQuestion[] = [
-  {
-    id: 'q-1',
-    pcepSection: 1,
-    pcepObjective: '1.4',
-    question: 'What is the output of the following Python snippet?',
-    codeSnippet: 'x = 2 ** 3 ** 2\nprint(x)',
-    options: ['64', '512', '36', 'SyntaxError'],
-    correctIndex: 1,
-    explanation: 'The exponentiation operator (**) binds from right to left (right-associative). Therefore, 2 ** 3 ** 2 is evaluated as 2 ** (3 ** 2) = 2 ** 9 = 512.',
-  },
-  {
-    id: 'q-2',
-    pcepSection: 1,
-    pcepObjective: '1.6',
-    question: 'What is the output of the following print statement?',
-    codeSnippet: 'print("A", "B", "C", sep="#", end="*")\nprint("D")',
-    options: ['A#B#C*D', 'A B C\\n#*D', 'A#B#C\\n*D', 'A#B#C*\\nD'],
-    correctIndex: 0,
-    explanation: 'sep="#" places "#" between "A", "B", and "C". end="*" prevents a newline and places "*" immediately at the end. The subsequent print("D") follows right on the same line.',
-  },
-  {
-    id: 'q-3',
-    pcepSection: 2,
-    pcepObjective: '2.1',
-    question: 'Which of the following values evaluates to False in a boolean context in Python?',
-    codeSnippet: '',
-    options: ['"False"', '[-1]', '()', '{"key": False}'],
-    correctIndex: 2,
-    explanation: 'An empty tuple () is falsy. Non-empty strings (including "False") and non-empty collections (even containing False or -1) evaluate to True.',
-  },
-  {
-    id: 'q-4',
-    pcepSection: 2,
-    pcepObjective: '2.6',
-    question: 'What will be printed by this code?',
-    codeSnippet: 'total = 0\nfor i in range(1, 10, 3):\n    total += i\nprint(total)',
-    options: ['12', '22', '15', '18'],
-    correctIndex: 0,
-    explanation: 'range(1, 10, 3) yields 1, 4, 7. 1 + 4 + 7 = 12 (10 is excluded by stop).',
-  },
-  {
-    id: 'q-5',
-    pcepSection: 3,
-    pcepObjective: '3.1',
-    question: 'What does the slice operation produce?',
-    codeSnippet: 'word = "PYTHON"\nprint(word[::-2])',
-    options: ['"NHY"', '"OTP"', '"NTP"', '"NOT"'],
-    correctIndex: 0,
-    explanation: 'A negative step stride [::-2] starts from the end of the string and steps backwards by 2: index -1 is "N", index -3 is "H", index -5 is "Y". The output is "NHY".',
-  },
-  {
-    id: 'q-6',
-    pcepSection: 3,
-    pcepObjective: '3.6',
-    question: 'What will happen when executing this code?',
-    codeSnippet: 'data = {1: "one", 2: "two"}\nprint(data.get(3, "missing"))',
-    options: ['Raises KeyError: 3', 'Prints None', 'Prints "missing"', 'Raises TypeError'],
-    correctIndex: 2,
-    explanation: 'The dictionary .get(key, default) method safely retrieves the value, returning the second argument ("missing") when the key is absent, avoiding a KeyError.',
-  },
-  {
-    id: 'q-7',
-    pcepSection: 4,
-    pcepObjective: '4.3',
-    question: 'What is the output of the following function call?',
-    codeSnippet: 'def add_item(item, basket=[]):\n    basket.append(item)\n    return basket\n\nprint(add_item("apple"))\nprint(add_item("banana"))',
-    options: [
-      '[\'apple\'] then [\'banana\']',
-      '[\'apple\'] then [\'apple\', \'banana\']',
-      '[\'banana\'] then [\'apple\', \'banana\']',
-      'Raises ValueError',
-    ],
-    correctIndex: 1,
-    explanation: 'Default argument expressions in Python are evaluated once at function definition time. The list [] persists across subsequent invocations.',
-  },
-  {
-    id: 'q-8',
-    pcepSection: 4,
-    pcepObjective: '4.7',
-    question: 'Which block in a try-except structure is guaranteed to execute regardless of whether an exception occurred?',
-    codeSnippet: '',
-    options: ['else', 'finally', 'except Exception', 'catch'],
-    correctIndex: 1,
-    explanation: 'The finally block always runs upon leaving the try-except statement, even if an uncaught exception or return occurs.',
-  },
-  {
-    id: 'q-9',
-    pcepSection: 5,
-    pcepObjective: '5.2',
-    question: 'What is the primary benefit of using the with open(...) statement in Python?',
-    codeSnippet: 'with open("data.txt", "r") as f:\n    content = f.read()',
-    options: [
-      'It speeds up read operations by 50%',
-      'It automatically closes the file even if exceptions occur inside the block',
-      'It automatically parses CSV data',
-      'It encrypts file access',
-    ],
-    correctIndex: 1,
-    explanation: 'The with statement acts as a context manager that guarantees the file descriptor is closed properly upon block exit, even if an unhandled exception interrupts execution.',
-  },
-  {
-    id: 'q-10',
-    pcepSection: 5,
-    pcepObjective: '5.5',
-    question: 'What is the return value of math.floor(4.9) and math.ceil(4.1)?',
-    codeSnippet: 'import math\nprint(math.floor(4.9), math.ceil(4.1))',
-    options: ['4 and 4', '5 and 5', '4 and 5', '5 and 4'],
-    correctIndex: 2,
-    explanation: 'math.floor(4.9) returns 4 (largest integer <= 4.9). math.ceil(4.1) returns 5 (smallest integer >= 4.1).',
-  },
-];
+export { PRACTICE_EXAM_QUESTIONS } from './mockExamQuestions';
 
 export const INITIAL_CHECKLIST_ITEMS: ChecklistItem[] = [
   {

@@ -11,7 +11,7 @@ export const ExamSimulator: React.FC = () => {
   const [examSubmitted, setExamSubmitted] = useState<boolean>(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
-  const [timeRemainingSeconds, setTimeRemainingSeconds] = useState<number>(45 * 60);
+  const [timeRemainingSeconds, setTimeRemainingSeconds] = useState<number>(60 * 60);
 
   const questions =
     selectedSection === 'all'
@@ -20,25 +20,25 @@ export const ExamSimulator: React.FC = () => {
 
   // Timer countdown
   useEffect(() => {
-    let timer: any;
-    if (examStarted && !examSubmitted && timeRemainingSeconds > 0) {
-      timer = setInterval(() => {
-        setTimeRemainingSeconds((prev) => {
-          if (prev <= 1) {
-            handleSubmitExam();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
+    if (!examStarted || examSubmitted) return;
+    const timer = setInterval(() => {
+      setTimeRemainingSeconds((prev) => Math.max(0, prev - 1));
+    }, 1000);
     return () => clearInterval(timer);
-  }, [examStarted, examSubmitted, timeRemainingSeconds]);
+  }, [examStarted, examSubmitted]);
+
+  // Auto-submit cleanly with latest selectedAnswers when timer hits 0
+  useEffect(() => {
+    if (examStarted && !examSubmitted && timeRemainingSeconds === 0) {
+      handleSubmitExam();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeRemainingSeconds, examStarted, examSubmitted]);
 
   const handleStartExam = () => {
     setSelectedAnswers({});
     setCurrentQuestionIndex(0);
-    setTimeRemainingSeconds(selectedSection === 'all' ? 45 * 60 : 15 * 60);
+    setTimeRemainingSeconds(selectedSection === 'all' ? 60 * 60 : 15 * 60);
     setExamSubmitted(false);
     setExamStarted(true);
   };
@@ -111,8 +111,9 @@ export const ExamSimulator: React.FC = () => {
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
+                type="button"
                 onClick={() => setSelectedSection('all')}
-                className={`p-4 rounded-xl border text-left transition-all ${
+                className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
                   selectedSection === 'all'
                     ? 'border-[#1E3A78] bg-[#1E3A78]/10 dark:bg-[#1E3A78]/30 dark:border-[#BDC3C7] shadow-xs'
                     : 'border-[#BDC3C7]/80 dark:border-[#2C3E50] bg-white/70 dark:bg-[#1A2634] hover:border-[#1E3A78]/60'
@@ -121,28 +122,32 @@ export const ExamSimulator: React.FC = () => {
                 <div className="font-bold text-xs text-[#2C3E50] dark:text-[#F5F5DC]">
                   Full Diagnostic Simulation (All 5 Domains)
                 </div>
-                <div className="text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7] mt-1">
-                  Covers all sections with official weight distribution · 45 mins
+                <div className="text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7] mt-1 font-mono">
+                  {PRACTICE_EXAM_QUESTIONS.length} questions · 10 per domain · 60 mins
                 </div>
               </button>
 
               {[1, 2, 3, 4, 5].map((sNum) => {
                 const sec = PCEP_SECTIONS.find((s) => s.sectionNumber === sNum);
+                const domainCount = PRACTICE_EXAM_QUESTIONS.filter(
+                  (q) => q.pcepSection === sNum
+                ).length;
                 return (
                   <button
+                    type="button"
                     key={sNum}
-                    onClick={() => setSelectedSection(sNum as any)}
-                    className={`p-4 rounded-xl border text-left transition-all ${
+                    onClick={() => setSelectedSection(sNum)}
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
                       selectedSection === sNum
                         ? 'border-[#1E3A78] bg-[#1E3A78]/10 dark:bg-[#1E3A78]/30 dark:border-[#BDC3C7] shadow-xs'
                         : 'border-[#BDC3C7]/80 dark:border-[#2C3E50] bg-white/70 dark:bg-[#1A2634] hover:border-[#1E3A78]/60'
                     }`}
                   >
                     <div className="font-bold text-xs text-[#2C3E50] dark:text-[#F5F5DC]">
-                      Section 0{sNum}: {sec?.shortTitle}
+                      Domain 0{sNum}: {sec?.shortTitle}
                     </div>
-                    <div className="text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7] mt-1">
-                      {sec?.weightPercentage}% Exam Weight · Targeted questions
+                    <div className="text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7] mt-1 font-mono">
+                      {domainCount} questions · {sec?.weightPercentage}% Exam Weight · 15 mins
                     </div>
                   </button>
                 );
@@ -322,16 +327,83 @@ export const ExamSimulator: React.FC = () => {
               </p>
             </div>
 
-            <div className="pt-2 flex items-center justify-center gap-3">
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
               <button
+                type="button"
                 onClick={handleStartExam}
-                className="px-4 py-2 text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-[#E5E5D8] dark:bg-[#1A2634] hover:bg-[#DCDCCF] dark:hover:bg-[#1E2936] rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer border border-[#BDC3C7] dark:border-[#2C3E50]"
+                className="px-4 py-2 text-xs font-semibold text-[#F5F5DC] bg-[#1E3A78] hover:bg-[#162C5C] rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Retake Exam</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setExamStarted(false);
+                  setExamSubmitted(false);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] bg-[#E5E5D8] dark:bg-[#1A2634] hover:bg-[#DCDCCF] dark:hover:bg-[#1E2936] rounded-lg transition-colors cursor-pointer border border-[#BDC3C7] dark:border-[#2C3E50]"
+              >
+                Change Exam Scope
+              </button>
             </div>
           </div>
+
+          {/* Domain Score Breakdown when taking full 5-domain simulation */}
+          {selectedSection === 'all' && (
+            <div className="p-6 rounded-2xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#243342] shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-sm text-[#2C3E50] dark:text-[#F5F5DC]">
+                  Domain Performance Breakdown
+                </h3>
+                <span className="text-[11px] font-mono text-[#2C3E50]/70 dark:text-[#BDC3C7]">
+                  Target: 70%+ per domain
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {PCEP_SECTIONS.map((sec) => {
+                  let dTotal = 0;
+                  let dCorrect = 0;
+                  questions.forEach((q, idx) => {
+                    if (q.pcepSection === sec.sectionNumber) {
+                      dTotal++;
+                      if (selectedAnswers[idx] === q.correctIndex) dCorrect++;
+                    }
+                  });
+                  const dPct = dTotal > 0 ? Math.round((dCorrect / dTotal) * 100) : 0;
+                  const dPassing = dPct >= 70;
+                  return (
+                    <div
+                      key={sec.sectionNumber}
+                      className="p-3 rounded-xl border border-[#BDC3C7]/70 dark:border-[#2C3E50] bg-white/80 dark:bg-[#1A2634] space-y-1.5"
+                    >
+                      <div className="text-[11px] font-mono font-bold text-[#1E3A78] dark:text-amber-300">
+                        Domain 0{sec.sectionNumber}
+                      </div>
+                      <div className="text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] truncate">
+                        {sec.shortTitle}
+                      </div>
+                      <div className="flex items-baseline justify-between font-mono text-xs tabular-nums pt-1">
+                        <span
+                          className={`font-bold ${
+                            dPassing
+                              ? 'text-emerald-700 dark:text-emerald-400'
+                              : 'text-amber-700 dark:text-amber-400'
+                          }`}
+                        >
+                          {dPct}%
+                        </span>
+                        <span className="text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7]">
+                          {dCorrect}/{dTotal}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Detailed Question Explanations */}
           <div className="space-y-4">
