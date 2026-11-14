@@ -33,6 +33,8 @@ export interface NotebookCellResult {
   engine: 'pyodide-wasm' | 'simulated-engine';
   executionCount: number;
   variables: KernelVariable[];
+  needsInput?: boolean;
+  inputPrompt?: string;
   stepCheck?: {
     passed: boolean;
     message?: string;
@@ -239,7 +241,8 @@ export async function reloadPythonRuntime(
 export async function executeNotebookCell(
   cellId: string,
   code: string,
-  stepCheck?: StepCheckConfig
+  stepCheck?: StepCheckConfig,
+  suppliedInputs: string[] = []
 ): Promise<NotebookCellResult> {
   return enqueueKernelTask(async () => {
     const startTime = performance.now();
@@ -257,8 +260,10 @@ export async function executeNotebookCell(
           '_pycert_expected_str',
           stepCheck?.expectedExample || 'matching output'
         );
+        pyodide.globals.set('_pycert_inputs_json', JSON.stringify(suppliedInputs));
 
         const driverResultJson = await pyodide.runPythonAsync(`
+import builtins as _pycert_builtins
 import contextlib as _pycert_ctx
 import io as _pycert_io
 import json as _pycert_json
@@ -270,10 +275,34 @@ if '_pycert_ns' not in globals() or not isinstance(_pycert_ns, dict):
     _pycert_ns = {}
 _pycert_ns['__name__'] = '__main__'
 
+_supplied_list = _pycert_json.loads(_pycert_inputs_json) if _pycert_inputs_json else []
+_input_idx = 0
+_need_input_prompt = None
+
+class _PyCertNeedInput(BaseException):
+    pass
+
 _stdout_io = _pycert_io.StringIO()
 _stderr_io = _pycert_io.StringIO()
+
+def _pycert_interactive_input(prompt=""):
+    global _input_idx, _need_input_prompt
+    prompt_str = "" if prompt is None else str(prompt)
+    if _input_idx < len(_supplied_list):
+        val = str(_supplied_list[_input_idx])
+        _input_idx += 1
+        _stdout_io.write(f"{prompt_str}{val}\\n")
+        return val
+    _need_input_prompt = prompt_str
+    raise _PyCertNeedInput(prompt_str)
+
+def _pycert_val_input(prompt=""):
+    raise RuntimeError("Inside graded functions, use the function parameter directly instead of calling input().")
+
 _prev_stdin = _pycert_sys.stdin
-_pycert_sys.stdin = _pycert_io.StringIO("")
+_prev_builtin_input = _pycert_builtins.input
+_pycert_sys.stdin = _pycert_io.StringIO("\\n".join(str(x) for x in _supplied_list) + ("\\n" if _supplied_list else ""))
+_pycert_builtins.input = _pycert_interactive_input
 
 _cell_err = None
 _check_passed = None
@@ -283,25 +312,28 @@ try:
     _compiled = compile(_pycert_cell_code, '<notebook_cell>', 'exec')
     with _pycert_ctx.redirect_stdout(_stdout_io), _pycert_ctx.redirect_stderr(_stderr_io):
         exec(_compiled, _pycert_ns)
+except _PyCertNeedInput:
+    pass
 except SystemExit as _exit_exc:
     if _exit_exc.code not in (None, 0):
         _cell_err = f"SystemExit: {_exit_exc.code}"
 except BaseException as _exc:
-    _tb_lines = _pycert_tb.format_exception(type(_exc), _exc, _exc.__traceback__)
-    _clean_tb = []
-    for _line in _tb_lines:
-        if 'File "<string>"' in _line or 'File "<exec>"' in _line:
-            continue
-        _clean_tb.append(_line.replace('File "<notebook_cell>"', 'In cell'))
-    _cell_err = "".join(_clean_tb).strip()
-    if isinstance(_exc, EOFError):
-        _cell_err += "\\n(Tip: Notebook cells run non-interactively — define variables or pass values as function arguments instead of input().)"
+    if _need_input_prompt is None:
+        _tb_lines = _pycert_tb.format_exception(type(_exc), _exc, _exc.__traceback__)
+        _clean_tb = []
+        for _line in _tb_lines:
+            if 'File "<string>"' in _line or 'File "<exec>"' in _line:
+                continue
+            _clean_tb.append(_line.replace('File "<notebook_cell>"', 'In cell'))
+        _cell_err = "".join(_clean_tb).strip()
 finally:
     _pycert_sys.stdin = _prev_stdin
+    _pycert_builtins.input = _prev_builtin_input
 
-if _cell_err is None and _pycert_has_check and _pycert_val_code:
+if _need_input_prompt is None and _cell_err is None and _pycert_has_check and _pycert_val_code:
     _val_stdout = _pycert_io.StringIO()
     _val_stderr = _pycert_io.StringIO()
+    _pycert_builtins.input = _pycert_val_input
     try:
         with _pycert_ctx.redirect_stdout(_val_stdout), _pycert_ctx.redirect_stderr(_val_stderr):
             exec(compile(_pycert_val_code, '<step_check>', 'exec'), _pycert_ns)
@@ -319,7 +351,9 @@ if _cell_err is None and _pycert_has_check and _pycert_val_code:
     except Exception as _chk_exc:
         _check_passed = False
         _check_msg = f"{type(_chk_exc).__name__}: {_chk_exc}"
-elif _cell_err is not None and _pycert_has_check:
+    finally:
+        _pycert_builtins.input = _prev_builtin_input
+elif _need_input_prompt is None and _cell_err is not None and _pycert_has_check:
     _check_passed = False
     _check_msg = "Fix the error in this cell above, then re-run."
 
@@ -344,6 +378,8 @@ for _k, _v in _pycert_ns.items():
 _vars_out.sort(key=lambda item: (1 if item["typeName"] in ("function", "module", "type") else 0, item["name"]))
 
 _pycert_json.dumps({
+    "needsInput": _need_input_prompt is not None,
+    "inputPrompt": _need_input_prompt,
     "stdout": _stdout_io.getvalue().rstrip("\\n"),
     "stderrStream": _stderr_io.getvalue().rstrip("\\n"),
     "cellError": _cell_err,
@@ -355,6 +391,20 @@ _pycert_json.dumps({
 
         const parsed = JSON.parse(String(driverResultJson));
         const durationMs = Math.round(performance.now() - startTime);
+
+        if (parsed.needsInput) {
+          return {
+            stdout: parsed.stdout || '',
+            stderr: '',
+            isError: false,
+            durationMs,
+            engine: 'pyodide-wasm',
+            executionCount: currentExecNum,
+            variables: parsed.variables || [],
+            needsInput: true,
+            inputPrompt: typeof parsed.inputPrompt === 'string' ? parsed.inputPrompt : '',
+          };
+        }
 
         const stderrCombined = [parsed.cellError, parsed.stderrStream]
           .filter(Boolean)
@@ -407,7 +457,7 @@ _pycert_json.dumps({
     }
 
     // Fallback stateful simulator if Pyodide CDN is unavailable or offline
-    return simulateNotebookCell(cellId, code, currentExecNum, startTime, stepCheck);
+    return simulateNotebookCell(cellId, code, currentExecNum, startTime, stepCheck, suppliedInputs);
   });
 }
 
@@ -566,13 +616,30 @@ function simulateNotebookCell(
   code: string,
   executionCount: number,
   startTime: number,
-  stepCheck?: StepCheckConfig
+  stepCheck?: StepCheckConfig,
+  suppliedInputs: string[] = []
 ): NotebookCellResult {
   simCellSources.set(cellId, code);
   const combinedCode = Array.from(simCellSources.values()).join('\n\n');
   const strippedCombined = stripPythonComments(combinedCode);
   const strippedCell = stripPythonComments(code);
   simExecutionVariables = extractSimVariables(strippedCombined);
+
+  const inputMatches = Array.from(strippedCell.matchAll(/input\(\s*(?:(["'])(.*?)\1)?\s*\)/g));
+  if (inputMatches.length > suppliedInputs.length) {
+    const nextPrompt = inputMatches[suppliedInputs.length]?.[2] ?? '';
+    return {
+      stdout: '',
+      stderr: '',
+      isError: false,
+      durationMs: Math.round(performance.now() - startTime),
+      engine: 'simulated-engine',
+      executionCount,
+      variables: simExecutionVariables,
+      needsInput: true,
+      inputPrompt: nextPrompt,
+    };
+  }
 
   const stdoutLines: string[] = [];
   let checkPassed = true;

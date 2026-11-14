@@ -44,6 +44,8 @@ interface CellRuntimeState {
   durationMs: number;
   engine: 'pyodide-wasm' | 'simulated-engine';
   variables: KernelVariable[];
+  needsInput?: boolean;
+  inputPrompt?: string;
   stepCheck?: {
     passed: boolean;
     message?: string;
@@ -84,8 +86,11 @@ export const Workspace: React.FC = () => {
     tag: string;
     note: string;
   } | null>(null);
+  const [cellInputs, setCellInputs] = useState<Record<string, string[]>>({});
+  const [pendingInputValues, setPendingInputValues] = useState<Record<string, string>>({});
 
   const cellTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
+  const inputPromptRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const executedCellsRef = useRef<Set<string>>(new Set());
   const activeProjectIdRef = useRef<string>(currentProject.id);
 
@@ -111,6 +116,8 @@ export const Workspace: React.FC = () => {
 
     setActiveWorkspaceTab('notebook');
     setCellResults({});
+    setCellInputs({});
+    setPendingInputValues({});
     setRunningCellId(null);
     setIsRunningAll(false);
     setIsKernelResetting(false);
@@ -182,6 +189,8 @@ export const Workspace: React.FC = () => {
         durationMs: result.durationMs,
         engine: result.engine,
         variables: result.variables,
+        needsInput: result.needsInput,
+        inputPrompt: result.inputPrompt,
         stepCheck: result.stepCheck,
       },
     }));
@@ -201,7 +210,20 @@ export const Workspace: React.FC = () => {
         }
       : undefined;
 
-  const handleRunCell = async (cell: NotebookCell, focusNext: boolean = false) => {
+  const focusCellInputPrompt = (cellId: string) => {
+    setPendingInputValues((prev) => ({ ...prev, [cellId]: '' }));
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        inputPromptRefs.current[cellId]?.focus();
+      }, 20);
+    });
+  };
+
+  const handleRunCell = async (
+    cell: NotebookCell,
+    focusNext: boolean = false,
+    overrideInputs?: string[]
+  ) => {
     if (isRunningAll || runningCellId || isKernelResetting) return;
     const projectIdAtStart = currentProject.id;
 
@@ -231,14 +253,20 @@ export const Workspace: React.FC = () => {
           const prevResult = await executeNotebookCell(
             prevCell.id,
             prevCode,
-            buildStepCheckPayload(prevStep)
+            buildStepCheckPayload(prevStep),
+            cellInputs[prevCell.id] || []
           );
 
           if (activeProjectIdRef.current !== projectIdAtStart) return;
+          applyExecutionResult(prevCell, prevResult, prevStep);
+          if (prevResult.needsInput) {
+            setKernelBannerMsg(`Enter input for "${prevCell.title}" to continue.`);
+            focusCellInputPrompt(prevCell.id);
+            return;
+          }
           if (!prevResult.isError) {
             executedCellsRef.current.add(prevCell.id);
           }
-          applyExecutionResult(prevCell, prevResult, prevStep);
           autoHydratedCount += 1;
         }
       }
@@ -247,15 +275,29 @@ export const Workspace: React.FC = () => {
       setRunningCellId(cell.id);
 
       const code = getLatestCellCode(cell.id);
-      const result = await executeNotebookCell(cell.id, code, buildStepCheckPayload(step));
+      const inputsToUse = overrideInputs ?? (cellInputs[cell.id] || []);
+      const result = await executeNotebookCell(
+        cell.id,
+        code,
+        buildStepCheckPayload(step),
+        inputsToUse
+      );
 
       if (activeProjectIdRef.current !== projectIdAtStart) return;
+      applyExecutionResult(cell, result, step);
+
+      if (result.needsInput) {
+        executedCellsRef.current.delete(cell.id);
+        setKernelBannerMsg(`Waiting for your input() response in ${cell.title}...`);
+        focusCellInputPrompt(cell.id);
+        return;
+      }
+
       if (!result.isError) {
         executedCellsRef.current.add(cell.id);
       } else {
         executedCellsRef.current.delete(cell.id);
       }
-      applyExecutionResult(cell, result, step);
 
       if (autoHydratedCount > 0) {
         setKernelBannerMsg(
@@ -277,6 +319,24 @@ export const Workspace: React.FC = () => {
     }
   };
 
+  const handleSubmitCellInput = async (e: React.FormEvent, cell: NotebookCell) => {
+    e.preventDefault();
+    if (isRunningAll || runningCellId || isKernelResetting) return;
+    const val = pendingInputValues[cell.id] ?? '';
+    const nextInputs = [...(cellInputs[cell.id] || []), val];
+    setCellInputs((prev) => ({ ...prev, [cell.id]: nextInputs }));
+    setPendingInputValues((prev) => ({ ...prev, [cell.id]: '' }));
+    await handleRunCell(cell, false, nextInputs);
+  };
+
+  const handleClearInputsAndRerun = async (cell: NotebookCell) => {
+    if (isRunningAll || runningCellId || isKernelResetting) return;
+    setCellInputs((prev) => ({ ...prev, [cell.id]: [] }));
+    setPendingInputValues((prev) => ({ ...prev, [cell.id]: '' }));
+    executedCellsRef.current.delete(cell.id);
+    await handleRunCell(cell, false, []);
+  };
+
   const handleRunAllCells = async () => {
     if (isRunningAll || runningCellId || isKernelResetting) return;
     const projectIdAtStart = currentProject.id;
@@ -294,13 +354,23 @@ export const Workspace: React.FC = () => {
         setRunningCellId(cell.id);
         const step = getStepForCell(cell);
         const code = getLatestCellCode(cell.id);
-        const result = await executeNotebookCell(cell.id, code, buildStepCheckPayload(step));
+        const result = await executeNotebookCell(
+          cell.id,
+          code,
+          buildStepCheckPayload(step),
+          cellInputs[cell.id] || []
+        );
 
         if (activeProjectIdRef.current !== projectIdAtStart) return;
+        applyExecutionResult(cell, result, step);
+        if (result.needsInput) {
+          setKernelBannerMsg(`Paused at "${cell.title}" waiting for input().`);
+          focusCellInputPrompt(cell.id);
+          return;
+        }
         if (!result.isError) {
           executedCellsRef.current.add(cell.id);
         }
-        applyExecutionResult(cell, result, step);
       }
 
       setKernelBannerMsg('All cells executed top to bottom in the shared kernel.');
@@ -318,6 +388,7 @@ export const Workspace: React.FC = () => {
     try {
       executedCellsRef.current.clear();
       setCellResults({});
+      setPendingInputValues({});
       const status = await reloadPythonRuntime(true);
       setKernelBannerMsg(
         status.ready
@@ -338,6 +409,8 @@ export const Workspace: React.FC = () => {
       resetProjectCode();
       await resetNotebookKernel();
       setCellResults({});
+      setCellInputs({});
+      setPendingInputValues({});
       setKernelBannerMsg('All cells restored to starter code and kernel restarted.');
     } finally {
       setIsKernelResetting(false);
@@ -1076,15 +1149,71 @@ export const Workspace: React.FC = () => {
                         </pre>
                       )}
 
+                      {result.needsInput && (
+                        <form
+                          onSubmit={(e) => handleSubmitCellInput(e, cell)}
+                          className="p-3 rounded-lg bg-[#141C24] border border-amber-400/50 space-y-2"
+                        >
+                          <div className="flex items-center justify-between gap-2 text-[11px] font-mono text-amber-300 font-semibold">
+                            <span>Python input() requested — enter a value below and press Enter</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {result.inputPrompt && (
+                              <span className="text-[#F5F5DC] font-mono text-xs whitespace-pre-wrap">
+                                {result.inputPrompt}
+                              </span>
+                            )}
+                            <input
+                              ref={(el) => {
+                                inputPromptRefs.current[cell.id] = el;
+                              }}
+                              type="text"
+                              value={pendingInputValues[cell.id] ?? ''}
+                              onChange={(e) =>
+                                setPendingInputValues((prev) => ({
+                                  ...prev,
+                                  [cell.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="Type input value..."
+                              aria-label="Python input value"
+                              className="flex-1 min-w-[180px] px-3 py-1.5 rounded-md bg-[#0E141B] border border-[#2C3E50] focus:border-amber-400 text-[#F5F5DC] font-mono text-xs focus:outline-hidden"
+                            />
+                            <button
+                              type="submit"
+                              disabled={isRunningAll || Boolean(runningCellId)}
+                              className="px-3.5 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-[#141C24] font-sans font-bold text-xs cursor-pointer disabled:opacity-50"
+                            >
+                              Submit
+                            </button>
+                          </div>
+                        </form>
+                      )}
+
                       {result.stderr && (
                         <pre className="whitespace-pre-wrap text-rose-300 bg-rose-950/40 p-2.5 rounded-lg border border-rose-500/30 leading-relaxed">
                           <code>{result.stderr}</code>
                         </pre>
                       )}
 
-                      {!result.stdout && !result.stderr && (
+                      {!result.stdout && !result.stderr && !result.needsInput && (
                         <div className="text-[#BDC3C7]/70 italic">
                           (Cell executed with no printed output.)
+                        </div>
+                      )}
+
+                      {(cellInputs[cell.id]?.length || 0) > 0 && !result.needsInput && (
+                        <div className="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#2C3E50]/60 text-[11px]">
+                          <span className="text-[#BDC3C7]/80">
+                            Supplied input(): <code className="text-amber-300">{JSON.stringify(cellInputs[cell.id])}</code>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleClearInputsAndRerun(cell)}
+                            className="px-2.5 py-1 rounded border border-[#2C3E50] text-amber-300 hover:bg-[#1E2936] cursor-pointer"
+                          >
+                            Re-run with New Inputs
+                          </button>
                         </div>
                       )}
                     </div>
