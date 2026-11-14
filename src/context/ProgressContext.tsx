@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { MicroProject, Flashcard, ChecklistItem, UserProgressState, UserProfile, StreakData } from '../types';
+import { MicroProject, Flashcard, ChecklistItem, UserProgressState, UserProfile, StreakData, SavedSnippet } from '../types';
 import { MICRO_PROJECTS, INITIAL_FLASHCARDS, INITIAL_CHECKLIST_ITEMS } from '../data/pcepCurriculum';
 import { BONUS_PROJECTS } from '../data/bonusProjects';
 
@@ -54,6 +54,13 @@ interface ProgressContextType {
   hasPracticedToday: boolean;
   selectedBonusProjectIds: string[];
   toggleBonusProjectSelection: (projectId: string) => void;
+  savedSnippets: SavedSnippet[];
+  addSavedSnippet: (snippet: Omit<SavedSnippet, 'id' | 'createdAt'>) => SavedSnippet;
+  updateSavedSnippet: (
+    id: string,
+    updates: Partial<Pick<SavedSnippet, 'title' | 'code' | 'note' | 'tag'>>
+  ) => void;
+  deleteSavedSnippet: (id: string) => void;
 }
 
 const STORAGE_KEY = 'pycert_user_progress_v1';
@@ -126,6 +133,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [flashcards, setFlashcards] = useState<Flashcard[]>(INITIAL_FLASHCARDS);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>(INITIAL_CHECKLIST_ITEMS);
   const [quizHistory, setQuizHistory] = useState<UserProgressState['quizHistory']>([]);
+  const [savedSnippets, setSavedSnippets] = useState<SavedSnippet[]>([]);
   const [streakData, setStreakData] = useState<StreakData>(INITIAL_STREAK);
   const [currentUser, setCurrentUser] = useState<UserProfile>({
     name: '',
@@ -139,6 +147,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     hasSeenTour: false,
     hasDismissedWelcome: false,
     studyPace: 'standard',
+    practiceDaysPerWeek: 5,
   });
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(true);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState<boolean>(false);
@@ -189,6 +198,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
         if (parsed.checklistItems) setChecklistItems(parsed.checklistItems);
         if (parsed.quizHistory) setQuizHistory(parsed.quizHistory);
+        if (Array.isArray(parsed.savedSnippets)) setSavedSnippets(parsed.savedSnippets);
         if (typeof parsed.darkMode === 'boolean') setDarkMode(parsed.darkMode);
         if (parsed.streakData) {
           const { currentStreak } = computeStreak(parsed.streakData.activityHistory || []);
@@ -228,6 +238,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           flashcards,
           checklistItems,
           quizHistory,
+          savedSnippets,
           darkMode,
           userProfile: currentUser,
           streakData,
@@ -236,7 +247,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch {
       // Ignore storage quota errors
     }
-  }, [completedStepsMap, codeSnapshots, cellSnapshots, selectedBonusProjectIds, flashcards, checklistItems, quizHistory, darkMode, currentUser, streakData]);
+  }, [completedStepsMap, codeSnapshots, cellSnapshots, selectedBonusProjectIds, flashcards, checklistItems, quizHistory, savedSnippets, darkMode, currentUser, streakData]);
 
   // Keep dark class on documentElement
   useEffect(() => {
@@ -461,6 +472,29 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     );
   };
 
+  const addSavedSnippet = (snippet: Omit<SavedSnippet, 'id' | 'createdAt'>): SavedSnippet => {
+    const newSnippet: SavedSnippet = {
+      ...snippet,
+      id: `snip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: new Date().toISOString(),
+    };
+    setSavedSnippets((prev) => [newSnippet, ...prev]);
+    return newSnippet;
+  };
+
+  const updateSavedSnippet = (
+    id: string,
+    updates: Partial<Pick<SavedSnippet, 'title' | 'code' | 'note' | 'tag'>>
+  ) => {
+    setSavedSnippets((prev) =>
+      prev.map((snip) => (snip.id === id ? { ...snip, ...updates } : snip))
+    );
+  };
+
+  const deleteSavedSnippet = (id: string) => {
+    setSavedSnippets((prev) => prev.filter((snip) => snip.id !== id));
+  };
+
   const updateUserProfile = (updates: Partial<UserProfile>) => {
     setCurrentUser((prev) => {
       const updated = { ...prev, ...updates };
@@ -486,6 +520,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setFlashcards(INITIAL_FLASHCARDS);
     setChecklistItems(INITIAL_CHECKLIST_ITEMS);
     setQuizHistory([]);
+    setSavedSnippets([]);
     setStreakData(INITIAL_STREAK);
     try {
       localStorage.setItem(
@@ -499,6 +534,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           flashcards: INITIAL_FLASHCARDS,
           checklistItems: INITIAL_CHECKLIST_ITEMS,
           quizHistory: [],
+          savedSnippets: [],
           darkMode,
           userProfile: currentUser,
           streakData: INITIAL_STREAK,
@@ -538,6 +574,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       experienceLevel,
       targetExamDate: currentUser.targetExamDate || defaultExamDate.toISOString().split('T')[0],
       studyPace: currentUser.studyPace || 'standard',
+      practiceDaysPerWeek: currentUser.practiceDaysPerWeek || 5,
       hasSeenTour: currentUser.hasSeenTour || false,
       hasDismissedWelcome: currentUser.hasDismissedWelcome || false,
       diagnosticResult: currentUser.diagnosticResult,
@@ -566,6 +603,7 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       hasSeenTour: false,
       hasDismissedWelcome: false,
       studyPace: 'standard',
+      practiceDaysPerWeek: 5,
     });
     setIsLoginModalOpen(true);
     setActiveView('home');
@@ -628,6 +666,10 @@ export const ProgressProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         hasPracticedToday: computeStreak(streakData.activityHistory).hasPracticedToday,
         selectedBonusProjectIds,
         toggleBonusProjectSelection,
+        savedSnippets,
+        addSavedSnippet,
+        updateSavedSnippet,
+        deleteSavedSnippet,
       }}
     >
       {children}

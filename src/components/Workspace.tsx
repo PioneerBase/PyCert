@@ -10,6 +10,7 @@ import {
 } from '../services/pythonRunner';
 import { downloadIpynbFile } from '../utils/ipynbExporter';
 import { BreadcrumbsDrawer } from './BreadcrumbsDrawer';
+import { SavedSnippetsTab } from './SavedSnippetsTab';
 import {
   Play,
   RotateCcw,
@@ -28,6 +29,9 @@ import {
   Terminal,
   Database,
   Download,
+  Bookmark,
+  Code2,
+  X,
 } from 'lucide-react';
 
 interface CellRuntimeState {
@@ -58,8 +62,11 @@ export const Workspace: React.FC = () => {
     markStepComplete,
     completedSteps,
     setActiveView,
+    savedSnippets,
+    addSavedSnippet,
   } = useProgress();
 
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'notebook' | 'snippets'>('notebook');
   const [cellResults, setCellResults] = useState<Record<string, CellRuntimeState>>({});
   const [runningCellId, setRunningCellId] = useState<string | null>(null);
   const [isRunningAll, setIsRunningAll] = useState<boolean>(false);
@@ -69,6 +76,12 @@ export const Workspace: React.FC = () => {
   const [isBreadcrumbsOpen, setIsBreadcrumbsOpen] = useState<boolean>(false);
   const [kernelBannerMsg, setKernelBannerMsg] = useState<string | null>(null);
   const [justExported, setJustExported] = useState<boolean>(false);
+  const [snippetDraft, setSnippetDraft] = useState<{
+    title: string;
+    code: string;
+    tag: string;
+    note: string;
+  } | null>(null);
 
   const cellTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
@@ -89,6 +102,7 @@ export const Workspace: React.FC = () => {
   // Reset shared Python kernel & clear stale inline cell outputs whenever switching labs
   useEffect(() => {
     let active = true;
+    setActiveWorkspaceTab('notebook');
     setCellResults({});
     setRunningCellId(null);
     setIsRunningAll(false);
@@ -292,6 +306,66 @@ export const Workspace: React.FC = () => {
     setCellCode(cell.id, cell.solutionCode);
   };
 
+  const handleOpenBookmarkFromCell = (cell: NotebookCell) => {
+    const textarea = cellTextareaRefs.current[cell.id];
+    const fullCode = getCellCode(cell.id);
+    let capturedCode = fullCode;
+    let isSelection = false;
+
+    if (textarea && textarea.selectionStart !== textarea.selectionEnd) {
+      const selected = textarea.value.slice(textarea.selectionStart, textarea.selectionEnd).trim();
+      if (selected.length > 0) {
+        capturedCode = selected;
+        isSelection = true;
+      }
+    }
+
+    setSnippetDraft({
+      title: isSelection ? `Selection — ${cell.title}` : cell.title,
+      code: capturedCode,
+      tag: `Domain ${currentProject.sectionNumber}`,
+      note: '',
+    });
+  };
+
+  const handleOpenBookmarkFromPattern = (step: ProjectStep) => {
+    if (!step.patternCode) return;
+    setSnippetDraft({
+      title: step.patternTitle || `Worked Pattern · Step ${step.stepNumber}`,
+      code: step.patternCode,
+      tag: 'Worked Pattern',
+      note: step.patternExplanation || '',
+    });
+  };
+
+  const handleConfirmSaveSnippet = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!snippetDraft || !snippetDraft.title.trim() || !snippetDraft.code.trim()) return;
+    const saved = addSavedSnippet({
+      title: snippetDraft.title.trim(),
+      code: snippetDraft.code,
+      tag: snippetDraft.tag,
+      note: snippetDraft.note.trim() || undefined,
+      sourceProjectTitle: currentProject.title,
+    });
+    setSnippetDraft(null);
+    setKernelBannerMsg(`Bookmarked "${saved.title}" to Saved Snippets.`);
+  };
+
+  const handleInsertSnippetIntoCell = (cellId: string, snippetCode: string) => {
+    const existing = getCellCode(cellId);
+    const trimmedExisting = existing.replace(/\s+$/, '');
+    const nextCode = trimmedExisting
+      ? `${trimmedExisting}\n\n${snippetCode}`
+      : snippetCode;
+    setCellCode(cellId, nextCode);
+    setActiveWorkspaceTab('notebook');
+    setKernelBannerMsg('Inserted saved snippet into your active notebook cell.');
+    requestAnimationFrame(() => {
+      cellTextareaRefs.current[cellId]?.focus();
+    });
+  };
+
   const completedCount = completedSteps.length;
   const totalSteps = currentProject.steps.length;
   const progressPct = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
@@ -366,6 +440,55 @@ export const Workspace: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Workspace Mode Tabs: Notebook Cells vs Saved Snippets */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#BDC3C7]/60 dark:border-[#2C3E50] pb-2">
+        <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-[#FAF9F5] dark:bg-[#141C24] border border-[#BDC3C7]/70 dark:border-[#2C3E50]">
+          <button
+            type="button"
+            onClick={() => setActiveWorkspaceTab('notebook')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer ${
+              activeWorkspaceTab === 'notebook'
+                ? 'bg-[#1E3A78] text-[#F5F5DC] shadow-xs'
+                : 'text-[#2C3E50]/80 dark:text-[#BDC3C7] hover:text-[#1E3A78] dark:hover:text-[#F5F5DC]'
+            }`}
+          >
+            <Code2 className="w-3.5 h-3.5" />
+            <span>Notebook Cells</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveWorkspaceTab('snippets')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer ${
+              activeWorkspaceTab === 'snippets'
+                ? 'bg-[#5A1827] text-[#F5F5DC] shadow-xs'
+                : 'text-[#2C3E50]/80 dark:text-[#BDC3C7] hover:text-[#1E3A78] dark:hover:text-[#F5F5DC]'
+            }`}
+          >
+            <Bookmark className="w-3.5 h-3.5" />
+            <span>Saved Snippets</span>
+            <span className="font-mono text-[10px] opacity-85 tabular-nums">
+              ({savedSnippets.length})
+            </span>
+          </button>
+        </div>
+
+        <span className="text-[11px] font-mono text-[#5D6D7E] dark:text-[#BDC3C7]">
+          {activeWorkspaceTab === 'notebook'
+            ? 'Tip: Highlight lines in any cell and click Save Snippet to bookmark them.'
+            : 'Reference, copy, or insert your saved Python blocks into the active lab.'}
+        </span>
+      </div>
+
+      {activeWorkspaceTab === 'snippets' ? (
+        <SavedSnippetsTab
+          cells={cells}
+          onInsertIntoCell={handleInsertSnippetIntoCell}
+          onSwitchToNotebook={() => setActiveWorkspaceTab('notebook')}
+        />
+      ) : (
+        <>
 
       {/* Notebook Header & Shared Kernel Controls */}
       <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4">
@@ -612,9 +735,20 @@ export const Workspace: React.FC = () => {
                 {/* Collapsible Analogous Worked Pattern Example */}
                 {step && step.patternCode && isPatternOpen && (
                   <div className="mt-2 p-3.5 rounded-xl bg-white dark:bg-[#141C24] border border-[#BDC3C7]/80 dark:border-[#2C3E50] space-y-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-[#1E3A78] dark:text-amber-300">
-                      <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                      <span>{step.patternTitle || 'Worked Pattern Example'}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#1E3A78] dark:text-amber-300">
+                        <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                        <span>{step.patternTitle || 'Worked Pattern Example'}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenBookmarkFromPattern(step)}
+                        className="px-2 py-1 rounded text-[11px] font-semibold text-[#1E3A78] dark:text-amber-300 hover:bg-[#1E3A78]/10 dark:hover:bg-amber-400/10 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        title="Bookmark this worked pattern to Saved Snippets"
+                      >
+                        <Bookmark className="w-3 h-3" />
+                        <span>Save Pattern</span>
+                      </button>
                     </div>
                     <pre className="p-3 rounded-lg bg-[#1E2936] text-emerald-300 font-mono text-xs overflow-x-auto leading-relaxed">
                       <code>{step.patternCode}</code>
@@ -672,6 +806,16 @@ export const Workspace: React.FC = () => {
                       title="Reset this cell to starter code"
                     >
                       Reset Cell
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenBookmarkFromCell(cell)}
+                      className="px-2.5 py-1 rounded text-amber-300 hover:text-amber-200 border border-[#2C3E50] hover:bg-[#1E2936] transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                      title="Bookmark highlighted selection (or full cell) to Saved Snippets"
+                    >
+                      <Bookmark className="w-3 h-3" />
+                      <span>Save Snippet</span>
                     </button>
 
                     <button
@@ -934,6 +1078,120 @@ export const Workspace: React.FC = () => {
               </button>
             ) : null}
           </div>
+        </div>
+      )}
+
+        </>
+      )}
+
+      {/* Bookmark Code Snippet Modal */}
+      {snippetDraft && (
+        <div className="fixed inset-0 z-50 bg-[#141C24]/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <form
+            onSubmit={handleConfirmSaveSnippet}
+            className="w-full max-w-lg rounded-2xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#1A2634] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+          >
+            <div className="px-5 py-3.5 border-b border-[#BDC3C7]/60 dark:border-[#2C3E50] bg-white dark:bg-[#141C24] flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-bold text-[#2C3E50] dark:text-[#F5F5DC]">
+                <Bookmark className="w-4 h-4 text-[#5A1827] dark:text-amber-400" />
+                <span>Bookmark to Saved Snippets</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSnippetDraft(null)}
+                className="p-1 rounded-lg text-[#2C3E50]/60 dark:text-[#BDC3C7] hover:text-[#2C3E50] dark:hover:text-[#F5F5DC] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] mb-1">
+                    Snippet Title
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={snippetDraft.title}
+                    onChange={(e) =>
+                      setSnippetDraft((prev) => (prev ? { ...prev, title: e.target.value } : null))
+                    }
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#BDC3C7] dark:border-[#2C3E50] bg-white dark:bg-[#141C24] text-[#2C3E50] dark:text-[#F5F5DC] focus:outline-hidden focus:border-[#1E3A78]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] mb-1">
+                    Tag
+                  </label>
+                  <select
+                    value={snippetDraft.tag}
+                    onChange={(e) =>
+                      setSnippetDraft((prev) => (prev ? { ...prev, tag: e.target.value } : null))
+                    }
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-[#BDC3C7] dark:border-[#2C3E50] bg-white dark:bg-[#141C24] text-[#2C3E50] dark:text-[#F5F5DC] focus:outline-hidden focus:border-[#1E3A78]"
+                  >
+                    <option value="Domain 1">Domain 1</option>
+                    <option value="Domain 2">Domain 2</option>
+                    <option value="Domain 3">Domain 3</option>
+                    <option value="Domain 4">Domain 4</option>
+                    <option value="Domain 5">Domain 5</option>
+                    <option value="Worked Pattern">Worked Pattern</option>
+                    <option value="General Python">General Python</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] mb-1">
+                  Code Block
+                </label>
+                <textarea
+                  rows={6}
+                  required
+                  spellCheck={false}
+                  value={snippetDraft.code}
+                  onChange={(e) =>
+                    setSnippetDraft((prev) => (prev ? { ...prev, code: e.target.value } : null))
+                  }
+                  className="w-full p-3 font-mono text-xs rounded-lg border border-[#2C3E50] bg-[#1E2936] text-[#F5F5DC] focus:outline-hidden focus:border-[#1E3A78]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] mb-1">
+                  Study Note (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={snippetDraft.note}
+                  onChange={(e) =>
+                    setSnippetDraft((prev) => (prev ? { ...prev, note: e.target.value } : null))
+                  }
+                  placeholder="Why is this block useful or what edge case does it solve?"
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-[#BDC3C7] dark:border-[#2C3E50] bg-white dark:bg-[#141C24] text-[#2C3E50] dark:text-[#F5F5DC] focus:outline-hidden focus:border-[#1E3A78]"
+                />
+              </div>
+            </div>
+
+            <div className="px-5 py-3 border-t border-[#BDC3C7]/60 dark:border-[#2C3E50] bg-white dark:bg-[#141C24] flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSnippetDraft(null)}
+                className="px-3.5 py-2 rounded-lg text-xs font-semibold text-[#2C3E50] dark:text-[#BDC3C7] hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-[#F5F5DC] bg-[#5A1827] hover:bg-[#48121E] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Bookmark className="w-3.5 h-3.5" />
+                <span>Save Snippet</span>
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

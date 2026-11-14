@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useProgress } from '../context/ProgressContext';
 import { MICRO_PROJECTS } from '../data/pcepCurriculum';
+import { BONUS_PROJECTS } from '../data/bonusProjects';
 import {
   X,
   User,
@@ -8,16 +9,47 @@ import {
   GitBranch,
   Calendar,
   Compass,
-  Award,
   Sparkles,
-  RotateCcw,
   CheckCircle2,
-  AlertTriangle,
   LogOut,
   HelpCircle,
   Clock,
   Save,
+  Calculator,
+  BookOpen,
+  Layers,
+  Award,
+  Rocket,
 } from 'lucide-react';
+
+function daysFromNow(dateStr: string): number {
+  if (!dateStr) return 30;
+  const parsed = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return 30;
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const diff = Math.round((parsed.getTime() - now.getTime()) / 86400000);
+  return Math.max(1, Math.min(365, diff));
+}
+
+function dateAfterDays(days: number): string {
+  const clamped = Math.max(1, Math.min(365, Math.round(days)));
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + clamped);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatDuration(totalMinutes: number): string {
+  const mins = Math.max(0, Math.round(totalMinutes));
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
+}
 
 export const AccountModal: React.FC = () => {
   const {
@@ -31,6 +63,9 @@ export const AccountModal: React.FC = () => {
     logout,
     readinessPercentage,
     completedStepsMap,
+    flashcards,
+    quizHistory,
+    selectedBonusProjectIds,
   } = useProgress();
 
   const [name, setName] = useState<string>(currentUser.name || '');
@@ -41,11 +76,15 @@ export const AccountModal: React.FC = () => {
     currentUser.experienceLevel || 'Beginner'
   );
   const [targetExamDate, setTargetExamDate] = useState<string>(
-    currentUser.targetExamDate || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+    currentUser.targetExamDate || dateAfterDays(30)
   );
   const [studyPace, setStudyPace] = useState<'relaxed' | 'standard' | 'intensive'>(
     currentUser.studyPace || 'standard'
   );
+  const [practiceDaysPerWeek, setPracticeDaysPerWeek] = useState<number>(
+    currentUser.practiceDaysPerWeek || 5
+  );
+  const [includeBonusInEstimate, setIncludeBonusInEstimate] = useState<boolean>(true);
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
   const [showResetConfirm, setShowResetConfirm] = useState<boolean>(false);
 
@@ -56,12 +95,167 @@ export const AccountModal: React.FC = () => {
     setGithubHandle(currentUser.githubHandle || '');
     setStartingDomain(currentUser.startingDomain || 1);
     setExperienceLevel(currentUser.experienceLevel || 'Beginner');
-    setTargetExamDate(
-      currentUser.targetExamDate ||
-        new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
-    );
+    setTargetExamDate(currentUser.targetExamDate || dateAfterDays(30));
     setStudyPace(currentUser.studyPace || 'standard');
+    setPracticeDaysPerWeek(currentUser.practiceDaysPerWeek || 5);
   }, [currentUser, isAccountModalOpen]);
+
+  const practiceWindowDays = useMemo(() => daysFromNow(targetExamDate), [targetExamDate]);
+
+  const estimator = useMemo(() => {
+    const expMultiplierMap: Record<string, number> = {
+      'Absolute Beginner': 1.2,
+      Beginner: 1.15,
+      Elementary: 1.0,
+      Intermediate: 0.9,
+      'Upper-Intermediate': 0.8,
+      'Advanced / Capstone': 0.7,
+    };
+    const expMultiplier = expMultiplierMap[experienceLevel] ?? 1.0;
+
+    // 1. Syllabus Concepts & Interactive Notebook Labs
+    let labMinutes = 0;
+    let remainingLabs = 0;
+    MICRO_PROJECTS.forEach((proj) => {
+      const doneCount = Math.min(proj.steps.length, completedStepsMap[proj.id]?.length || 0);
+      const remainingRatio =
+        proj.steps.length > 0 ? Math.max(0, (proj.steps.length - doneCount) / proj.steps.length) : 0;
+      if (remainingRatio > 0) remainingLabs += 1;
+      // Include domain concept reading, objective review, and debugging buffer alongside lab runtime
+      const fullDomainMinutes = (proj.estimatedMinutes || 20) + 42;
+      labMinutes += fullDomainMinutes * remainingRatio * expMultiplier;
+    });
+    labMinutes = Math.round(labMinutes);
+
+    // 2. Spaced-Repetition Flashcards
+    const unmasteredCards = flashcards.filter((c) => c.boxLevel < 3).length;
+    const flashcardMinutes = Math.round(
+      unmasteredCards > 0 ? unmasteredCards * 3.5 * expMultiplier : 15
+    );
+
+    // 3. Mock Exams & Explanation Review (40-min PCEP mock + ~15-min review)
+    const targetMocks = 3;
+    const completedMocks = quizHistory.length;
+    const remainingMocks =
+      readinessPercentage >= 90 && completedMocks >= targetMocks
+        ? 0
+        : Math.max(1, targetMocks - completedMocks);
+    const mockExamMinutes = Math.round(remainingMocks * 50);
+
+    // 4. Optional Queued Bonus Projects
+    let bonusMinutes = 0;
+    let remainingBonusCount = 0;
+    if (includeBonusInEstimate && selectedBonusProjectIds.length > 0) {
+      selectedBonusProjectIds.forEach((bonusId) => {
+        const bonusProj = BONUS_PROJECTS.find((b) => b.id === bonusId);
+        if (!bonusProj) return;
+        const doneCount = Math.min(
+          bonusProj.steps.length,
+          completedStepsMap[bonusProj.id]?.length || 0
+        );
+        const remainingRatio =
+          bonusProj.steps.length > 0
+            ? Math.max(0, (bonusProj.steps.length - doneCount) / bonusProj.steps.length)
+            : 0;
+        if (remainingRatio > 0) remainingBonusCount += 1;
+        bonusMinutes += (bonusProj.estimatedMinutes || 20) * 1.4 * remainingRatio * expMultiplier;
+      });
+    }
+    bonusMinutes = Math.round(bonusMinutes);
+
+    const totalMinutes = labMinutes + flashcardMinutes + mockExamMinutes + bonusMinutes;
+
+    // Active practice days given chosen window & days/week
+    const activePracticeDays = Math.max(
+      1,
+      Math.round((practiceWindowDays * practiceDaysPerWeek) / 7)
+    );
+    const dailyMinutesNeeded = totalMinutes > 0 ? Math.max(5, Math.ceil(totalMinutes / activePracticeDays)) : 0;
+    const weeklyMinutesNeeded = Math.round(
+      dailyMinutesNeeded * Math.min(practiceDaysPerWeek, activePracticeDays)
+    );
+
+    // Recommended days at user's selected Study Pace
+    const paceDailyCapacity: Record<'relaxed' | 'standard' | 'intensive', number> = {
+      relaxed: 25,
+      standard: 45,
+      intensive: 85,
+    };
+    const paceCapacity = paceDailyCapacity[studyPace];
+    const activeDaysAtPace = totalMinutes > 0 ? Math.max(1, Math.ceil(totalMinutes / paceCapacity)) : 0;
+    const calendarDaysAtPace =
+      activeDaysAtPace > 0
+        ? Math.max(1, Math.ceil((activeDaysAtPace * 7) / practiceDaysPerWeek))
+        : 0;
+
+    let outlook: {
+      label: string;
+      summary: string;
+      badgeClass: string;
+    };
+
+    if (totalMinutes === 0) {
+      outlook = {
+        label: 'Exam-Ready',
+        summary: 'Core labs, flashcards, and mock targets are covered. Use your remaining days for light refreshers.',
+        badgeClass: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800',
+      };
+    } else if (dailyMinutesNeeded <= 30) {
+      outlook = {
+        label: 'Comfortable Pace',
+        summary: 'Plenty of room for spaced repetition, hands-on debugging, and calm mock exam reviews.',
+        badgeClass: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800',
+      };
+    } else if (dailyMinutesNeeded <= 60) {
+      outlook = {
+        label: 'Balanced Prep Plan',
+        summary: 'Steady daily focus covers all PCEP objectives and 3 practice exam passes right on schedule.',
+        badgeClass: 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border-blue-300 dark:border-blue-800',
+      };
+    } else if (dailyMinutesNeeded <= 95) {
+      outlook = {
+        label: 'Focused Sprint',
+        summary: 'Expect dedicated daily coding sessions. Prioritize core Syllabus Labs and timed Mock Exams first.',
+        badgeClass: 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border-amber-300 dark:border-amber-800',
+      };
+    } else {
+      outlook = {
+        label: 'High-Intensity Cram',
+        summary: 'Heavy daily workload for this timeline. Consider adding more practice days or increasing days/week.',
+        badgeClass: 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 border-rose-300 dark:border-rose-800',
+      };
+    }
+
+    return {
+      labMinutes,
+      remainingLabs,
+      flashcardMinutes,
+      unmasteredCards,
+      mockExamMinutes,
+      remainingMocks,
+      bonusMinutes,
+      remainingBonusCount,
+      totalMinutes,
+      activePracticeDays,
+      dailyMinutesNeeded,
+      weeklyMinutesNeeded,
+      paceCapacity,
+      activeDaysAtPace,
+      calendarDaysAtPace,
+      outlook,
+    };
+  }, [
+    experienceLevel,
+    completedStepsMap,
+    flashcards,
+    quizHistory,
+    readinessPercentage,
+    includeBonusInEstimate,
+    selectedBonusProjectIds,
+    practiceWindowDays,
+    practiceDaysPerWeek,
+    studyPace,
+  ]);
 
   if (!isAccountModalOpen) return null;
 
@@ -93,6 +287,7 @@ export const AccountModal: React.FC = () => {
       experienceLevel,
       targetExamDate,
       studyPace,
+      practiceDaysPerWeek,
       role: `Domain 0${startingDomain} Candidate · ${experienceLevel}`,
     });
 
@@ -104,9 +299,7 @@ export const AccountModal: React.FC = () => {
   };
 
   const handleQuickExamDays = (days: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    setTargetExamDate(d.toISOString().split('T')[0]);
+    setTargetExamDate(dateAfterDays(days));
   };
 
   const handleConfirmReset = () => {
@@ -254,7 +447,7 @@ export const AccountModal: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div>
                 <label className="block text-xs font-semibold text-[#2C3E50] dark:text-[#F5F5DC] mb-1">
-                  Target Exam Date
+                  Target Exam Date ({practiceWindowDays}d away)
                 </label>
                 <div className="relative">
                   <Calendar className="w-3.5 h-3.5 text-[#2C3E50]/50 dark:text-[#BDC3C7] absolute left-3 top-1/2 -translate-y-1/2" />
@@ -265,29 +458,22 @@ export const AccountModal: React.FC = () => {
                     className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-white dark:bg-[#141C24] text-[#2C3E50] dark:text-[#F5F5DC] focus:outline-hidden focus:border-[#1E3A78]"
                   />
                 </div>
-                <div className="flex items-center gap-1.5 mt-1.5">
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                   <span className="text-[10px] text-[#2C3E50]/60 dark:text-[#BDC3C7]">Presets:</span>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickExamDays(14)}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-[#FAF9F5] dark:bg-[#243342] border border-[#BDC3C7]/60 dark:border-[#2C3E50] hover:bg-[#EBE9DF]"
-                  >
-                    14 Days
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickExamDays(30)}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-[#FAF9F5] dark:bg-[#243342] border border-[#BDC3C7]/60 dark:border-[#2C3E50] hover:bg-[#EBE9DF]"
-                  >
-                    30 Days
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickExamDays(60)}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-[#FAF9F5] dark:bg-[#243342] border border-[#BDC3C7]/60 dark:border-[#2C3E50] hover:bg-[#EBE9DF]"
-                  >
-                    60 Days
-                  </button>
+                  {[7, 14, 30, 45, 60].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => handleQuickExamDays(d)}
+                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                        practiceWindowDays === d
+                          ? 'bg-[#1E3A78] text-[#F5F5DC] border-[#1E3A78] font-bold'
+                          : 'bg-[#FAF9F5] dark:bg-[#243342] border-[#BDC3C7]/60 dark:border-[#2C3E50] text-[#2C3E50] dark:text-[#BDC3C7] hover:bg-[#EBE9DF] dark:hover:bg-[#2C3E50]'
+                      }`}
+                    >
+                      {d}d
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -297,14 +483,240 @@ export const AccountModal: React.FC = () => {
                 </label>
                 <select
                   value={studyPace}
-                  onChange={(e) => setStudyPace(e.target.value as any)}
+                  onChange={(e) => setStudyPace(e.target.value as 'relaxed' | 'standard' | 'intensive')}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-[#BDC3C7] dark:border-[#2C3E50] bg-white dark:bg-[#141C24] text-[#2C3E50] dark:text-[#F5F5DC] focus:outline-hidden focus:border-[#1E3A78]"
                 >
-                  <option value="relaxed">Relaxed (1 Lab / 2 Days)</option>
-                  <option value="standard">Standard (1-2 Labs / Day)</option>
-                  <option value="intensive">Intensive (Full Immersion)</option>
+                  <option value="relaxed">Relaxed (~25 min/day)</option>
+                  <option value="standard">Standard (~45 min/day)</option>
+                  <option value="intensive">Intensive (~85 min/day)</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* Section 2.5: Exam Prep & Practice Time Estimator */}
+          <div className="p-4 sm:p-5 rounded-xl border border-[#BDC3C7]/70 dark:border-[#2C3E50] bg-[#FAF9F5] dark:bg-[#141C24] space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-[#1E3A78]/10 dark:bg-amber-400/10 text-[#1E3A78] dark:text-amber-400 flex items-center justify-center shrink-0">
+                  <Calculator className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#2C3E50] dark:text-[#F5F5DC] font-mono">
+                    Prep & Practice Time Estimator
+                  </h3>
+                  <p className="text-[11px] text-[#2C3E50]/70 dark:text-[#BDC3C7]">
+                    Adjust practice days to estimate daily study time needed before exam day.
+                  </p>
+                </div>
+              </div>
+
+              <span
+                className={`px-2.5 py-1 rounded-md border text-[10px] font-mono font-bold ${estimator.outlook.badgeClass}`}
+              >
+                {estimator.outlook.label}
+              </span>
+            </div>
+
+            {/* Interactive Controls: Days Slider + Days/Week Selector */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <label
+                    htmlFor="prep-days-slider"
+                    className="font-semibold text-[#2C3E50] dark:text-[#F5F5DC]"
+                  >
+                    Prep Window (Days)
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      min={1}
+                      max={180}
+                      value={practiceWindowDays}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!Number.isNaN(val)) {
+                          handleQuickExamDays(Math.max(1, Math.min(180, val)));
+                        }
+                      }}
+                      className="w-14 px-1.5 py-0.5 text-right text-xs font-mono font-bold rounded border border-[#BDC3C7] dark:border-[#2C3E50] bg-white dark:bg-[#1A2634] text-[#1E3A78] dark:text-amber-400 tabular-nums focus:outline-hidden focus:border-[#1E3A78]"
+                    />
+                    <span className="text-[11px] font-mono text-[#2C3E50]/65 dark:text-[#BDC3C7]">
+                      days
+                    </span>
+                  </div>
+                </div>
+                <input
+                  id="prep-days-slider"
+                  type="range"
+                  min={1}
+                  max={90}
+                  value={Math.min(90, practiceWindowDays)}
+                  onChange={(e) => handleQuickExamDays(parseInt(e.target.value, 10))}
+                  className="w-full accent-[#1E3A78] dark:accent-amber-400 cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] font-mono text-[#2C3E50]/55 dark:text-[#BDC3C7]/70">
+                  <span>1 day</span>
+                  <span>30 days</span>
+                  <span>60 days</span>
+                  <span>90 days</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-[#2C3E50] dark:text-[#F5F5DC]">
+                    Days You Practice / Week
+                  </span>
+                  <span className="font-mono text-[11px] font-bold text-[#1E3A78] dark:text-amber-400 tabular-nums">
+                    {estimator.activePracticeDays} active days total
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 gap-1.5 pt-0.5">
+                  {[3, 4, 5, 6, 7].map((daysPerWk) => (
+                    <button
+                      key={daysPerWk}
+                      type="button"
+                      onClick={() => setPracticeDaysPerWeek(daysPerWk)}
+                      className={`py-1.5 rounded-lg text-xs font-mono font-semibold border transition-colors cursor-pointer ${
+                        practiceDaysPerWeek === daysPerWk
+                          ? 'bg-[#1E3A78] text-[#F5F5DC] border-[#1E3A78] shadow-xs'
+                          : 'bg-white dark:bg-[#1A2634] text-[#2C3E50] dark:text-[#BDC3C7] border-[#BDC3C7]/70 dark:border-[#2C3E50] hover:bg-[#EBE9DF] dark:hover:bg-[#243342]'
+                      }`}
+                    >
+                      {daysPerWk}d
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-[#2C3E50]/65 dark:text-[#BDC3C7]">
+                  Studying {practiceDaysPerWeek} days/wk over {practiceWindowDays} calendar days.
+                </p>
+              </div>
+            </div>
+
+            {/* Key Metric Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="p-3 rounded-xl bg-white dark:bg-[#1A2634] border border-[#BDC3C7]/60 dark:border-[#2C3E50]">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-[#2C3E50]/65 dark:text-[#BDC3C7]">
+                  <Clock className="w-3 h-3 text-[#1E3A78] dark:text-amber-400" />
+                  <span>Total Prep Needed</span>
+                </div>
+                <div className="mt-1 text-lg font-extrabold font-mono text-[#1E3A78] dark:text-[#F5F5DC] tabular-nums">
+                  {estimator.totalMinutes === 0 ? '0m' : `~${formatDuration(estimator.totalMinutes)}`}
+                </div>
+                <div className="text-[10px] text-[#2C3E50]/65 dark:text-[#BDC3C7]">
+                  Adjusted for {experienceLevel}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white dark:bg-[#1A2634] border border-[#BDC3C7]/60 dark:border-[#2C3E50]">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-[#2C3E50]/65 dark:text-[#BDC3C7]">
+                  <Calendar className="w-3 h-3 text-[#5A1827] dark:text-rose-400" />
+                  <span>Daily Practice Target</span>
+                </div>
+                <div className="mt-1 text-lg font-extrabold font-mono text-[#5A1827] dark:text-amber-400 tabular-nums">
+                  {estimator.dailyMinutesNeeded === 0
+                    ? 'Done'
+                    : `~${formatDuration(estimator.dailyMinutesNeeded)}/day`}
+                </div>
+                <div className="text-[10px] text-[#2C3E50]/65 dark:text-[#BDC3C7] tabular-nums">
+                  ~{formatDuration(estimator.weeklyMinutesNeeded)} / week
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-white dark:bg-[#1A2634] border border-[#BDC3C7]/60 dark:border-[#2C3E50]">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-[#2C3E50]/65 dark:text-[#BDC3C7]">
+                  <Compass className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                  <span>At Selected Pace</span>
+                </div>
+                <div className="mt-1 text-lg font-extrabold font-mono text-[#2C3E50] dark:text-[#F5F5DC] tabular-nums">
+                  {estimator.calendarDaysAtPace === 0
+                    ? 'Ready'
+                    : `~${estimator.calendarDaysAtPace} days`}
+                </div>
+                <div className="flex items-center justify-between gap-1 text-[10px] text-[#2C3E50]/65 dark:text-[#BDC3C7]">
+                  <span>{estimator.paceCapacity}m/day pace</span>
+                  {estimator.calendarDaysAtPace > 0 &&
+                    estimator.calendarDaysAtPace !== practiceWindowDays && (
+                      <button
+                        type="button"
+                        onClick={() => handleQuickExamDays(estimator.calendarDaysAtPace)}
+                        className="text-[#1E3A78] dark:text-amber-400 font-semibold hover:underline cursor-pointer"
+                      >
+                        Match
+                      </button>
+                    )}
+                </div>
+              </div>
+            </div>
+
+            {/* Breakdown by Prep Activity */}
+            <div className="space-y-2 pt-1 border-t border-[#BDC3C7]/40 dark:border-[#2C3E50]">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-[#2C3E50] dark:text-[#F5F5DC]">
+                  Remaining Workload Breakdown
+                </span>
+                {selectedBonusProjectIds.length > 0 && (
+                  <label className="flex items-center gap-1.5 text-[11px] text-[#2C3E50]/80 dark:text-[#BDC3C7] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeBonusInEstimate}
+                      onChange={(e) => setIncludeBonusInEstimate(e.target.checked)}
+                      className="rounded border-[#BDC3C7] accent-[#1E3A78]"
+                    />
+                    <span>Include queued bonus projects ({selectedBonusProjectIds.length})</span>
+                  </label>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/80 dark:bg-[#1A2634] border border-[#BDC3C7]/40 dark:border-[#2C3E50]">
+                  <span className="flex items-center gap-1.5 text-[#2C3E50]/80 dark:text-[#BDC3C7]">
+                    <BookOpen className="w-3.5 h-3.5 text-[#1E3A78] dark:text-blue-400" />
+                    <span>Syllabus & Labs ({estimator.remainingLabs}/5 left)</span>
+                  </span>
+                  <span className="font-mono font-bold text-[#2C3E50] dark:text-[#F5F5DC] tabular-nums">
+                    {formatDuration(estimator.labMinutes)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/80 dark:bg-[#1A2634] border border-[#BDC3C7]/40 dark:border-[#2C3E50]">
+                  <span className="flex items-center gap-1.5 text-[#2C3E50]/80 dark:text-[#BDC3C7]">
+                    <Layers className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                    <span>Flashcard Drills ({estimator.unmasteredCards} cards)</span>
+                  </span>
+                  <span className="font-mono font-bold text-[#2C3E50] dark:text-[#F5F5DC] tabular-nums">
+                    {formatDuration(estimator.flashcardMinutes)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/80 dark:bg-[#1A2634] border border-[#BDC3C7]/40 dark:border-[#2C3E50]">
+                  <span className="flex items-center gap-1.5 text-[#2C3E50]/80 dark:text-[#BDC3C7]">
+                    <Award className="w-3.5 h-3.5 text-[#5A1827] dark:text-rose-400" />
+                    <span>Mock Exams ({estimator.remainingMocks} runs + review)</span>
+                  </span>
+                  <span className="font-mono font-bold text-[#2C3E50] dark:text-[#F5F5DC] tabular-nums">
+                    {formatDuration(estimator.mockExamMinutes)}
+                  </span>
+                </div>
+
+                {selectedBonusProjectIds.length > 0 && includeBonusInEstimate && (
+                  <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white/80 dark:bg-[#1A2634] border border-[#BDC3C7]/40 dark:border-[#2C3E50]">
+                    <span className="flex items-center gap-1.5 text-[#2C3E50]/80 dark:text-[#BDC3C7]">
+                      <Rocket className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>Bonus Projects ({estimator.remainingBonusCount} left)</span>
+                    </span>
+                    <span className="font-mono font-bold text-[#2C3E50] dark:text-[#F5F5DC] tabular-nums">
+                      {formatDuration(estimator.bonusMinutes)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-[11px] text-[#2C3E50]/75 dark:text-[#BDC3C7] leading-relaxed">
+                {estimator.outlook.summary}
+              </p>
             </div>
           </div>
 

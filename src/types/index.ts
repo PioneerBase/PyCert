@@ -176,6 +176,7 @@ export interface UserProfile {
   experienceLevel?: string;
   targetExamDate?: string;
   studyPace?: 'relaxed' | 'standard' | 'intensive';
+  practiceDaysPerWeek?: number;
   hasSeenTour?: boolean;
   hasDismissedWelcome?: boolean;
   diagnosticResult?: {
@@ -199,6 +200,16 @@ export interface StreakData {
   };
 }
 
+export interface SavedSnippet {
+  id: string;
+  title: string;
+  code: string;
+  note?: string;
+  tag: string;
+  sourceProjectTitle?: string;
+  createdAt: string;
+}
+
 export interface UserProgressState {
   completedProjectIds: string[];
   projectSnapshots: Record<string, { code: string; currentStep: number; completedSteps: number[] }>;
@@ -212,6 +223,7 @@ export interface UserProgressState {
     percentage: number;
   }>;
   checklistItems: ChecklistItem[];
+  savedSnippets?: SavedSnippet[];
   userProfile?: UserProfile;
   streakData?: StreakData;
 }
