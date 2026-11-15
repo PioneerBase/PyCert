@@ -671,7 +671,11 @@ function simulateNotebookCell(
 
   if (stepCheck) {
     const sn = stepCheck.stepNumber;
-    if (strippedCombined.includes('def celsius_to_fahrenheit')) {
+    if (
+      strippedCombined.includes('def celsius_to_fahrenheit') ||
+      strippedCombined.includes('def trip_fuel_stops') ||
+      strippedCombined.includes('def format_trip_banner')
+    ) {
       if (sn === 1) {
         const b1 = extractFnBody('celsius_to_fahrenheit');
         const hasFormula =
@@ -692,6 +696,7 @@ function simulateNotebookCell(
         const b3 = extractFnBody('format_trip_banner');
         checkPassed =
           b3.length > 0 &&
+          !b3.includes('banner = ""') &&
           !b3.trim().endsWith('return ""') &&
           (b3.includes('F') || b3.includes('stops')) &&
           b3.includes('{');

@@ -88,6 +88,7 @@ export const Workspace: React.FC = () => {
   } | null>(null);
   const [cellInputs, setCellInputs] = useState<Record<string, string[]>>({});
   const [pendingInputValues, setPendingInputValues] = useState<Record<string, string>>({});
+  const [solutionPreviewBackups, setSolutionPreviewBackups] = useState<Record<string, string>>({});
 
   const cellTextareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
   const inputPromptRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -118,6 +119,7 @@ export const Workspace: React.FC = () => {
     setCellResults({});
     setCellInputs({});
     setPendingInputValues({});
+    setSolutionPreviewBackups({});
     setRunningCellId(null);
     setIsRunningAll(false);
     setIsKernelResetting(false);
@@ -411,6 +413,7 @@ export const Workspace: React.FC = () => {
       setCellResults({});
       setCellInputs({});
       setPendingInputValues({});
+      setSolutionPreviewBackups({});
       setKernelBannerMsg('All cells restored to starter code and kernel restarted.');
     } finally {
       setIsKernelResetting(false);
@@ -474,9 +477,28 @@ export const Workspace: React.FC = () => {
     setTimeout(() => setCopiedCellId(null), 1800);
   };
 
-  const handleLoadCellSolution = (cell: NotebookCell) => {
-    updateCellCodeAndInvalidate(cell.id, cell.solutionCode);
-    clearSingleCellResult(cell.id);
+  const handleToggleCellSolution = (cell: NotebookCell) => {
+    const isShowingSolution = cell.id in solutionPreviewBackups;
+    if (isShowingSolution) {
+      const originalCode = solutionPreviewBackups[cell.id];
+      setSolutionPreviewBackups((prev) => {
+        const next = { ...prev };
+        delete next[cell.id];
+        return next;
+      });
+      updateCellCodeAndInvalidate(cell.id, originalCode);
+      clearSingleCellResult(cell.id);
+      setKernelBannerMsg(`Restored your previous code in ${cell.title}.`);
+    } else {
+      const currentEditorCode = getLatestCellCode(cell.id);
+      setSolutionPreviewBackups((prev) => ({
+        ...prev,
+        [cell.id]: currentEditorCode,
+      }));
+      updateCellCodeAndInvalidate(cell.id, cell.solutionCode);
+      clearSingleCellResult(cell.id);
+      setKernelBannerMsg(`Showing reference solution for ${cell.title}. Click "Hide Solution" to return to your code.`);
+    }
   };
 
   const handleOpenBookmarkFromCell = (cell: NotebookCell) => {
@@ -965,16 +987,36 @@ export const Workspace: React.FC = () => {
 
                     <button
                       type="button"
-                      onClick={() => handleLoadCellSolution(cell)}
-                      className="px-2.5 py-1 rounded text-[#BDC3C7] hover:text-[#F5F5DC] border border-[#2C3E50] hover:bg-[#1E2936] transition-colors cursor-pointer whitespace-nowrap"
-                      title="Fill this cell with the reference solution"
+                      onClick={() => handleToggleCellSolution(cell)}
+                      className={`px-2.5 py-1 rounded border transition-colors cursor-pointer whitespace-nowrap ${
+                        cell.id in solutionPreviewBackups
+                          ? 'text-amber-300 border-amber-400/60 bg-amber-500/15 hover:bg-amber-500/25 font-semibold'
+                          : 'text-[#BDC3C7] hover:text-[#F5F5DC] border-[#2C3E50] hover:bg-[#1E2936]'
+                      }`}
+                      title={
+                        cell.id in solutionPreviewBackups
+                          ? 'Hide the solution and restore your previous code'
+                          : 'Preview the reference solution in this cell'
+                      }
                     >
-                      Show Solution
+                      {cell.id in solutionPreviewBackups ? 'Hide Solution' : 'Show Solution'}
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
+                        setSolutionPreviewBackups((prev) => {
+                          if (!(cell.id in prev)) return prev;
+                          const next = { ...prev };
+                          delete next[cell.id];
+                          return next;
+                        });
+                        setCellInputs((prev) => {
+                          if (!(cell.id in prev)) return prev;
+                          const next = { ...prev };
+                          delete next[cell.id];
+                          return next;
+                        });
                         resetCellCode(cell.id);
                         clearSingleCellResult(cell.id);
                       }}

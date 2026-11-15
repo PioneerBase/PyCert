@@ -132,8 +132,9 @@ def trip_fuel_stops(total_miles, miles_per_tank):
 # STEP 3: Build and print a clean road trip banner
 # Example return: "77.0 F | 2 stops | 50 mi left"
 def format_trip_banner(temp_f, stops, extra):
-    # TODO (Step 3): Return f"{temp_f} F | {stops} stops | {extra} mi left"
-    return ""
+    # TODO (Step 3): Set banner = f"{temp_f} F | {stops} stops | {extra} mi left" and return banner
+    banner = ""
+    return banner
 
 
 if __name__ == "__main__":
@@ -154,7 +155,8 @@ def trip_fuel_stops(total_miles, miles_per_tank):
     return (full_stops, leftover_miles)
 
 def format_trip_banner(temp_f, stops, extra):
-    return f"{temp_f} F | {stops} stops | {extra} mi left"
+    banner = f"{temp_f} F | {stops} stops | {extra} mi left"
+    return banner
 
 if __name__ == "__main__":
     temp_f = celsius_to_fahrenheit(25)
@@ -214,15 +216,19 @@ print("Full stops:", stops, "| Extra miles:", extra)`,
         stepNumber: 3,
         title: 'Cell 3 · Format Shared Trip Summary',
         starterCode: `# Cell 3 (Step 3): Uses temp_f, stops, and extra from Cells 1 & 2!
+banner = ""
+
 def format_trip_banner(temp_f, stops, extra):
-    # TODO: Return f"{temp_f} F | {stops} stops | {extra} mi left"
-    return ""
+    # TODO: Set banner = f"{temp_f} F | {stops} stops | {extra} mi left" and return banner
+    banner = ""
+    return banner
 
 banner = format_trip_banner(temp_f, stops, extra)
 print("Road Trip Summary:", banner, sep=" -> ", end="\\n[Done]\\n")`,
         solutionCode: `# Cell 3 (Step 3): Uses temp_f, stops, and extra from Cells 1 & 2!
 def format_trip_banner(temp_f, stops, extra):
-    return f"{temp_f} F | {stops} stops | {extra} mi left"
+    banner = f"{temp_f} F | {stops} stops | {extra} mi left"
+    return banner
 
 banner = format_trip_banner(temp_f, stops, extra)
 print("Road Trip Summary:", banner, sep=" -> ", end="\\n[Done]\\n")`,
@@ -271,18 +277,19 @@ print("Road Trip Summary:", banner, sep=" -> ", end="\\n[Done]\\n")`,
       {
         stepNumber: 3,
         title: 'Step 3: Format the Summary String',
-        taskInstruction: 'Inside format_trip_banner(temp_f, stops, extra), replace return "" with return f"{temp_f} F | {stops} stops | {extra} mi left". Notice it automatically uses temp_f, stops, and extra from Cells 1 & 2!',
+        taskInstruction: 'Inside format_trip_banner(temp_f, stops, extra), set banner = f"{temp_f} F | {stops} stops | {extra} mi left" and return banner. Notice it automatically uses temp_f, stops, and extra from Cells 1 & 2!',
         targetObjectiveId: '1.6',
         patternTitle: 'Worked Pattern (Building a Summary Banner)',
         patternCode: `def score_banner(points, level):
-    return f"{points} pts | Level {level}"`,
+    banner = f"{points} pts | Level {level}"
+    return banner`,
         patternExplanation: 'Putting f before quotes lets you insert any variable directly inside {curly_braces}, converting numbers into text automatically.',
         expectedExample: 'format_trip_banner(77.0, 2, 50) -> "77.0 F | 2 stops | 50 mi left"',
         diagnosticExpr: 'format_trip_banner(77.0, 2, 50)',
         breadcrumbs: {
           level1Concept: 'An f-string (f"...{var}...") is the cleanest way to combine numbers and labels into one readable string.',
-          level2Syntax: 'return f"{temp_f} F | {stops} stops | {extra} mi left"',
-          level3Scaffold: 'def format_trip_banner(temp_f, stops, extra):\n    return f"{temp_f} F | {stops} stops | {extra} mi left"',
+          level2Syntax: 'banner = f"{temp_f} F | {stops} stops | {extra} mi left"\nreturn banner',
+          level3Scaffold: 'def format_trip_banner(temp_f, stops, extra):\n    banner = f"{temp_f} F | {stops} stops | {extra} mi left"\n    return banner',
         },
         validationSnippet: 'assert format_trip_banner(77.0, 2, 50) == "77.0 F | 2 stops | 50 mi left"',
       },
